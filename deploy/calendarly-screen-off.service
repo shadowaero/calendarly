@@ -1,0 +1,9 @@
+[Unit]
+Description=Turn off Calendarly display (power save)
+
+[Service]
+Type=oneshot
+User=xxtoon
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=WAYLAND_DISPLAY=wayland-0
+ExecStart=/usr/bin/wlr-randr --output HDMI-A-1 --off
