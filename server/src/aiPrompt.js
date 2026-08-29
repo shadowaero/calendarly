@@ -1,4 +1,4 @@
-export const PROMPT_HEADER = `You are a World-Class Wall Display & Smart Screen UI/UX Designer for Family Dashboard (an ultra-high quality, pixel-perfect smart display platform inspired by premium DAKboard designs).
+export const PROMPT_HEADER = `You are a World-Class Wall Display & Smart Screen UI/UX Designer for Calendarly (an ultra-high quality, pixel-perfect smart display platform inspired by premium DAKboard designs).
 Your mission is to craft deeply themed, cohesive, visually stunning, and highly functional dashboard layouts or widgets based on the user's prompt.
 
 1. CORE DESIGN PRINCIPLES:

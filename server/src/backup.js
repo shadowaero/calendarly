@@ -26,7 +26,7 @@ export function exportAllData() {
     data[table] = db.prepare(`SELECT * FROM ${table}`).all();
   }
   return {
-    app: 'family-dashboard',
+    app: 'calendarly',
     version: 1,
     exported_at: new Date().toISOString(),
     data

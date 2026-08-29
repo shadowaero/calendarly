@@ -14,7 +14,7 @@ router.use((req, res, next) => {
 router.get('/backup', (req, res) => {
   try {
     const data = exportAllData();
-    const filename = `family-dashboard-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const filename = `calendarly-backup-${new Date().toISOString().slice(0, 10)}.json`;
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/json');
     res.send(JSON.stringify(data, null, 2));

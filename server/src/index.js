@@ -89,5 +89,5 @@ backupCron.start();
 refreshAllFeeds().catch(err => console.error('Initial feed fetch error:', err));
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Family Dashboard Server running at http://0.0.0.0:${PORT}`);
+  console.log(`🚀 Calendarly Server running at http://0.0.0.0:${PORT}`);
 });

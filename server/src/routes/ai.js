@@ -206,8 +206,8 @@ export async function callLLM(config, messages) {
   const headers = { 'Content-Type': 'application/json' };
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
   if (provider === 'openrouter') {
-    headers['HTTP-Referer'] = 'https://family-dashboard.local';
-    headers['X-Title'] = 'Family Dashboard';
+    headers['HTTP-Referer'] = 'https://calendarly.local';
+    headers['X-Title'] = 'Calendarly';
   }
 
   const payload = {
