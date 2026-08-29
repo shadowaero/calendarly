@@ -19,14 +19,17 @@ export default function AIGeneratorModal({
   const [showSettings, setShowSettings] = useState(false);
 
   const samplePrompts = targetMode === 'screen' ? [
-    "Thanksgiving harvest theme with rolling 4-week calendar on right (65% width) and agenda with weather on left",
-    "Chalkboard school schedule with month grid, weekly chores tracker, and daily facts block",
-    "Christmas holiday cozy theme with warm fireplace photo background, quote block, and agenda",
-    "Minimal dark modern command center with 5-day weather forecast, big clock, and family chore list"
+    "Halloween spooky theme with purple/orange gradient, month calendar, and a fun pumpkin banner",
+    "Harry Potter-inspired magical theme with Hogwarts-style banner, spell emoji, and a quote block",
+    "Elegant sophisticated minimalist calendar in soft cream and gold with a refined feel",
+    "Funny playful family command center with jokes, bright colors, and a big clock",
+    "Cozy winter Christmas theme with a warm photo background, agenda, and holiday quote",
+    "Modern dark command center with weather forecast, radar, and family chore list"
   ] : [
-    "Thanksgiving styled notes block with autumnal orange theme",
-    "5-day weather forecast widget with dark slate background",
-    "Rolling 3-week calendar in handwritten font style"
+    "Spooky Halloween quote block with orange and purple",
+    "Playful funny daily facts block",
+    "Elegant gold-accented notes block",
+    "5-day weather forecast widget with dark slate background"
   ];
 
   const handleGenerate = async (promptToUse = prompt) => {
