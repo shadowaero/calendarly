@@ -1,0 +1,7 @@
+# Dependencies are installed fresh inside each Docker build stage
+node_modules
+# Build output is regenerated inside the image
+dist
+# Local logs & OS junk
+*.log
+.DS_Store

@@ -1,0 +1,24 @@
+services:
+  family-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: family-dashboard
+    restart: always
+    environment:
+      - PUID=999
+      - PGID=10
+      - TZ=America/New_York
+      - NODE_ENV=production
+      - PORT=3000
+      - DATA_DIR=/volume1/docker/family-dashboard/data
+    ports:
+      - "3080:3000"
+    volumes:
+      - /volume1/docker/family-dashboard/data:/volume1/docker/family-dashboard/data
+    networks:
+      - family_net
+
+networks:
+  family_net:
+    driver: bridge

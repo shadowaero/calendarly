@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Runtime data / database
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+# Uploads & backups
+photos/
+backups/
+
+# Environment
+.env
+.env.*
+
+# Logs & OS junk
+*.log
+.DS_Store
