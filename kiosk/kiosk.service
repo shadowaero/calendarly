@@ -1,0 +1,16 @@
+[Unit]
+Description=Family Dashboard Chromium Kiosk
+After=network-online.target graphical.target
+Wants=network-online.target
+
+[Service]
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+Type=simple
+User=pi
+ExecStart=/home/pi/kiosk.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Turn off Calendarly display at 9:30 PM
+
+[Timer]
+OnCalendar=*-*-* 21:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
