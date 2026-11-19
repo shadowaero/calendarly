@@ -2,7 +2,7 @@
 // fdw-apply-eventedit.cjs — injects calendar event-editing kit into a deployed
 // vite bundle (in place, no rebuild; keeps all previously injected kits intact).
 // Token policy (matches radar patchers): the cache-bust token lives in index.html
-// only — this kit bumps ?v=ws6zt there (bundle carries no jsVer literal).
+// only — this kit bumps ?v=ws6zu there (bundle carries no jsVer literal).
 // usage: node --experimental-vm-modules fdw-apply-eventedit.cjs <index-*.js> [index.html]
 // Idempotent: skips if "Edit Family Event" already present. Backup: *.bak-eventedit
 const fs = require('fs');
@@ -23,12 +23,15 @@ const edits = [
   // E3 modal heading reflects edit vs add
   ['," Add Family Event"]',
    ',window.__fdvEditId!=null?"Edit Family Event":"Add Family Event"]'],
-  // E4 DayOverflowModal: add ✎ button before delete button (local events)
+  // E4 DayOverflowModal: add ✎ button before delete button (local events).
+  // NOTE: the row map uses local consts h,g,x — the prop MUST NOT be named `g` there
+  // (a prop named g is shadowed ⇒ tap calls a string ⇒ TypeError, button dead). Use editEv.
+  // User spacing request: delete button gains ml-6 so ✎ sits further from 🗑.
   ['h.source==="local"&&d&&n.jsx("button",{onClick:()=>d(h.id),className:"p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition shrink-0",title:"Delete event",children:n.jsx(At,{className:"w-4 h-4"})})',
-   'h.source==="local"&&g&&n.jsx("button",{onClick:()=>g(h),className:"p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-950/40 rounded-lg transition shrink-0",title:"Edit event",children:n.jsx("svg",{className:"w-4 h-4",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[n.jsx("path",{d:"M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"}),n.jsx("path",{d:"m15 5 4 4"})]})}),h.source==="local"&&d&&n.jsx("button",{onClick:()=>d(h.id),className:"p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition shrink-0",title:"Delete event",children:n.jsx(At,{className:"w-4 h-4"})})'],
-  // E5 DayOverflowModal props: accept onEditEvent
+   'h.source==="local"&&editEv&&n.jsx("button",{onClick:()=>editEv(h),className:"p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-950/40 rounded-lg transition shrink-0",title:"Edit event",children:n.jsx("svg",{className:"w-4 h-4",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[n.jsx("path",{d:"M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"}),n.jsx("path",{d:"m15 5 4 4"})]})}),h.source==="local"&&d&&n.jsx("button",{onClick:()=>d(h.id),className:"ml-6 p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition shrink-0",title:"Delete event",children:n.jsx(At,{className:"w-4 h-4"})})'],
+  // E5 DayOverflowModal props: accept onEditEvent (collision-proof arg name editEv)
   ['function Gx({isOpen:a,onClose:i,date:o,events:u,onDeleteEvent:d}){',
-   'function Gx({isOpen:a,onClose:i,date:o,events:u,onDeleteEvent:d,onEditEvent:g}){'],
+   'function Gx({isOpen:a,onClose:i,date:o,events:u,onDeleteEvent:d,onEditEvent:editEv}){'],
   // E6 CalendarView: wire onEditEvent -> stash payload, open create-modal
   ['n.jsx(Gx,{isOpen:I,onClose:()=>K(!1),date:R,events:R?Y(R):[],onDeleteEvent:h})',
    'n.jsx(Gx,{isOpen:I,onClose:()=>K(!1),date:R,events:R?Y(R):[],onDeleteEvent:h,onEditEvent:ee=>{window.__fdvEdit=ee,X(Ge(R,"yyyy-MM-dd")),K(!1),E(!0)}})']
@@ -56,10 +59,10 @@ if (htmlPath && fs.existsSync(htmlPath)) {
   const hc = html.split('?v=ws6zs').length - 1;
   if (hc === 1) {
     fs.copyFileSync(htmlPath, htmlPath + '.bak-eventedit');
-    html = html.replace('?v=ws6zs', '?v=ws6zt');
+    html = html.replace('?v=ws6zs', '?v=ws6zu');
     fs.writeFileSync(htmlPath, html);
-    console.log('APPLY HTML OK ?v=ws6zt');
+    console.log('APPLY HTML OK ?v=ws6zu');
   } else {
-    console.log('HTML skip (q-count=' + hc + (html.includes('?v=ws6zt') ? ' already ws6zt' : '') + ') eol=' + (hEOL === '\r\n' ? 'CRLF' : 'LF'));
+    console.log('HTML skip (q-count=' + hc + (html.includes('?v=ws6zu') ? ' already ws6zt' : '') + ') eol=' + (hEOL === '\r\n' ? 'CRLF' : 'LF'));
   }
 }
