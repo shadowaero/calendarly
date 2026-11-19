@@ -1,5 +1,7 @@
 // rwRV — standalone RainViewer radar block (RainViewer public API animated over dark OSM base; resizable via block size)
-// config keys: lat, lon, zoom (3-11, default 7), color (palette id), label, pause (1 = animate off; shows latest past frame), ctl (1 = +/- zoom buttons + two-finger pinch on the map; zoom persists per label in localStorage)
+// Timeline (rvT30): the last ~30 min of radar + RainViewer's nowcast forecast, always playing FORWARD
+// in time (oldest -> now -> forecast, then wraps). Future frames get an "FCST +Nm" badge by the clock.
+// config keys: lat, lon, zoom (3-11, default 7), color (palette id), label, pause (1 = freeze frame), ctl (1 = +/- zoom buttons + two-finger pinch on the map; zoom persists per label in localStorage)
 function rwRV(props) {
   const a = (props && props.config) || {};
   const lat = isFinite(Number(a.lat)) ? Number(a.lat) : 28.817422;
@@ -28,32 +30,37 @@ function rwRV(props) {
     const pull = function () { fetch('https://api.rainviewer.com/public/weather-maps.json').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setRvData(j); }).catch(function () { if (!dead) setRvData(null); }); };
     pull(); const iv = setInterval(pull, 300000); return function () { dead = true; clearInterval(iv); };
   }, []);
-  const rvFrames = (rvData && rvData.radar) ? (rvData.radar.past || []).concat(rvData.radar.nowcast || []) : [];
-  // rvXF v1 — crossfade + pingpong radar loop. Two stacked overlay layers: the outgoing frame
+  // rvT30 — timeline: last ~4 past frames (~30 min of trend) + RainViewer's nowcast forecast frames
+  // (the public API only forecasts ~+30 min ahead). Older frames are deliberately dropped: the kiosk
+  // wants "recent trend -> what's coming", not a two-hour history replay.
+  const rvFrames = (rvData && rvData.radar) ? (rvData.radar.past || []).slice(-4).concat(rvData.radar.nowcast || []) : [];
+  // rvXF v2 — crossfade + forward-only radar loop. Two stacked overlay layers: the outgoing frame
   // stays painted while the incoming one fades in over it ('opacity .48s linear'), every frame's
-  // tiles are prefetched (rvPL), and the playhead ping-pongs (rvPP) with a short beat at the
-  // newest frame instead of hard-wrapping from the future frame back to the oldest one.
-  const rvPos = b.useRef(-1); const rvDir = b.useRef(1); const rvHold = b.useRef(0);
+  // tiles are prefetched (rvPL), and the playhead (rvPP) always steps forward — 30 min of radar
+  // trend, through now, into the nowcast — wrapping back to the oldest after a beat on the newest.
+  const rvPos = b.useRef(-1); const rvHold = b.useRef(0);
   const rvN = b.useRef(-1); const rvK = b.useRef(0); const rvPre = b.useRef([]);
-  // start on the LATEST past frame (current radar) and rebuild the buffer when frames change
+  // start on the NOW frame (latest past frame in the trimmed timeline); rebuild when frames change
   b.useEffect(function () {
     if (!rvData || !rvData.radar) return;
-    const np = (rvData.radar.past || []).length;
-    const cur = np > 0 ? np - 1 : Math.max(0, rvFrames.length - 1);
-    rvPos.current = cur; rvN.current = cur; rvK.current = 0; rvDir.current = 1; rvHold.current = 0;
+    const nPast = Math.min(4, (rvData.radar.past || []).length);
+    const L = rvFrames.length;
+    const cur = nPast > 0 ? nPast - 1 : Math.max(0, L - 1);
+    rvPos.current = cur; rvN.current = cur; rvK.current = 0; rvHold.current = 0;
     setBuf({ n: cur, o: cur, k: 0 });
   }, [rvData]);
-  // rvPP — smooth pingpong playback: 620 ms/step, 480 ms crossfade, 2-beat hold at the newest frame
+  // rvPP — forward-only playback: 620 ms/step, 480 ms crossfade, 2-beat hold on the newest
+  // (forecast) frame, then wrap back to the oldest so every loop replays trend -> forecast
   b.useEffect(function () {
     if (!rvPlay || rvFrames.length < 2) return;
     const t = setInterval(function () {
       const L = rvFrames.length;
       if (rvHold.current > 0) { rvHold.current--; return; }
-      let p = rvPos.current + rvDir.current;
-      if (p >= L || p < 0) { rvDir.current = -rvDir.current; if (rvDir.current < 0) { rvHold.current = 2; p = rvPos.current; } else { p = rvPos.current + rvDir.current; } p = Math.max(0, Math.min(L - 1, p)); }
+      const p = (rvPos.current + 1) % L;
       if (p === rvPos.current) return;
       const prevN = rvN.current;
       rvPos.current = p; rvN.current = p; rvK.current = 1 - rvK.current;
+      if (p === L - 1) rvHold.current = 2;
       setBuf({ n: p, o: prevN, k: rvK.current });
     }, 620);
     return function () { clearInterval(t); };
@@ -124,6 +131,10 @@ function rwRV(props) {
   }, [rvData, rvZoom, rvBox.w, rvBox.h]);
   const rvTime = rvFrame ? new Date(rvFrame.time * 1000) : null;
   const rvTimeStr = rvTime ? (((rvTime.getHours() % 12) === 0 ? 12 : rvTime.getHours() % 12) + ':' + (rvTime.getMinutes() < 10 ? '0' : '') + rvTime.getMinutes() + (rvTime.getHours() < 12 ? ' AM' : ' PM')) : '';
+  // rvFC — forecast badge: nowcast frames sit in the future, so show an "FCST +Nm" pill by the clock
+  const rvNow = Date.now() / 1000;
+  const rvFcst = rvFrame && rvFrame.time && rvFrame.time > rvNow + 60;
+  const rvFcMin = rvFcst ? Math.round((rvFrame.time - rvNow) / 60) : 0;
   return n.jsxs('div', { className: 'h-full w-full flex flex-col overflow-hidden relative', style: { background: 'linear-gradient(180deg,#101c30 0%,#0a1526 100%)', borderRadius: 14, border: '1px solid rgba(255,255,255,.06)' }, children: [
     n.jsxs('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 4px', flexShrink: 0 }, children: [
       n.jsx('div', { style: { fontSize: '11pt', fontWeight: 800, letterSpacing: '.08em', color: '#dbe4f0', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }, children: rvLabel }),
@@ -131,7 +142,8 @@ function rwRV(props) {
         CTL ? n.jsx('button', { type: 'button', onClick: function () { rvSet(rvZoom - 1); }, style: { width: 24, height: 24, borderRadius: '999px', border: '1px solid rgba(255,255,255,.25)', background: 'rgba(255,255,255,.08)', color: '#e2e9f2', fontSize: 13, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, opacity: rvZoom <= 3 ? 0.35 : 1 }, children: '\u2212' }) : null,
         CTL ? n.jsx('button', { type: 'button', onClick: function () { rvSet(rvZoom + 1); }, style: { width: 24, height: 24, borderRadius: '999px', border: '1px solid rgba(255,255,255,.25)', background: 'rgba(255,255,255,.08)', color: '#e2e9f2', fontSize: 12, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, opacity: rvZoom >= 10 ? 0.35 : 1 }, children: '+' }) : null,
         n.jsx('button', { type: 'button', onClick: function () { setRvPlay(!rvPlay); }, style: { width: 22, height: 22, borderRadius: '999px', border: '1px solid rgba(255,255,255,.25)', background: 'rgba(255,255,255,.08)', color: '#e2e9f2', fontSize: 10, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }, children: rvPlay ? '\u23F8' : '\u25B6' }),
-        n.jsx('span', { style: { fontSize: '9pt', color: '#93a7c0', fontWeight: 600 }, children: rvTimeStr || 'Loading\u2026' })
+        n.jsx('span', { style: { fontSize: '9pt', color: '#93a7c0', fontWeight: 600 }, children: rvTimeStr || 'Loading\u2026' }),
+        rvFcst ? n.jsx('span', { style: { fontSize: '8pt', fontWeight: 800, letterSpacing: '.08em', color: '#7ff3ff', background: 'rgba(0,140,160,.28)', border: '1px solid rgba(127,243,255,.55)', borderRadius: 6, padding: '1px 6px', whiteSpace: 'nowrap' }, children: 'FCST +' + rvFcMin + 'm' }) : null
       ] })
     ] }),
     n.jsx('div', { ref: rvRef, onTouchStart: pvStart, onTouchMove: pvMove, onTouchEnd: pvEnd, onTouchCancel: pvEnd, style: { position: 'relative', flex: '1 1 auto', minHeight: 0, overflow: 'hidden', touchAction: CTL ? 'none' : undefined }, children: rvBox.w ? n.jsxs('div', { style: { position: 'absolute', left: 0, top: 0 }, children: [

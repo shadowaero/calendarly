@@ -7,7 +7,7 @@
 // Backups: orig7.* (bundle + index.html, taken before any change). Rollback: cp orig7.<name> <name>.
 const fs = require('fs');
 const path = require('path');
-const jsVer = 'ws6z';
+const jsVer = 'ws6zr';
 const report = { steps: [], ok: true };
 const step = (name, status, extra) => { report.steps.push({ name, status, extra }); console.log('[' + status + '] ' + name + (extra ? ' :: ' + extra : '')); if (status === 'FAIL') report.ok = false; };
 const dist = process.env.FDW_DIST || '/app/client/dist';
