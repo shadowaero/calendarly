@@ -17,8 +17,17 @@
 - App facts you'll want next: calendarly runs at `/opt/calendarly` (`server/src`, `client/dist`,
   `data/dashboard.sqlite`), systemd unit `calendarly.service`, kiosk = `kiosk.sh` → Chromium
   `http://127.0.0.1:3000/?mode=display`. Weather deployment state: `wave4/fd_weather/DEPLOY-NOTES.md`.
-- Sudo remotely (needs the current interactive password, NOT stored here):
-  `ssh pi4kiosk 'echo <PW> | sudo -p "" -S <cmd>'`
+- Sudo remotely (silent file-stdin pattern since 2026-11-19 - nothing typed in chat or logs):
+  - The current xxtoon sudo password lives ONLY in a local file outside this repo:
+    `C:\Users\xxtoo\pinew.txt` (line 1 = password; intentionally kept for future
+    sudo automation - do not move it into the repo or chat).
+  - Run a remote sudo cmd silently (streams the file content straight into the sudo prompt):
+    `Get-Content C:\Users\xxtoo\pinew.txt | ssh pi4kiosk "sudo -S -p '' -k true && echo SUDO_OK"`
+  - Rotate the password (new pw goes through the same file; helper streams it to the Pi
+    /tmp with chmod 600, feeds chpasswd via the old-pw sudo prompt, then `sudo -k` + a fresh
+    sudo with the new pw to verify, then removes the remote temp file):
+    `node tmp/pi-passwd-rotate2.cjs [pwfile-path]`
+    (untracked tmp helper - update its OLD password constant to the then-current value before reusing it).
 
 ### How the Pi key was installed (recovery recipe if key access is ever lost)
 One-time bootstrap with a live password (used plink 0.85, cached at `%TEMP%\fdw-pi\plink.exe`):
@@ -40,6 +49,7 @@ plink -ssh -batch -hostkey "SHA256:Vn6s6Hs5Fq7qzUp6XNdnsduDbvkn/rf+Zd8B1PiAIdA" 
 
 ## House rules
 - Never put passwords in repo files or notes; keys + one-time prompts only. Rotate any password
-  that was shared in chat immediately after use (Pi password was rotated after bootstrap).
+  that was shared in chat immediately after use (Pi password was rotated after bootstrap,
+  and again 2026-11-19; sudo access is now supplied silently via the local pw-file pattern above).
 - Deploy/verify scripts pattern: local file → base64 → `ssh <host> 'echo <b64> | base64 -d > /tmp/x && …'`.
 - Related docs: `wave4/fd_weather/DEPLOY-NOTES.md` (top section = Pi deployment state).
