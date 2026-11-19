@@ -1,0 +1,15 @@
+[Unit]
+Description=Feed rtl_433 readings to family-dashboard
+After=rtl433.service network-online.target
+Wants=rtl433.service
+
+[Service]
+Environment=FDW_TOKEN=FDW_TOKEN_REPLACE
+Environment=FDW_BASE=http://127.0.0.1:3000
+Environment=FDW_RTL_JSON=/var/run/rtl433.json
+ExecStart=/usr/bin/python3 /usr/local/bin/rtl433-feed.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

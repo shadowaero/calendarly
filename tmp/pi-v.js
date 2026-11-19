@@ -1,0 +1,14 @@
+const vm = require("vm");
+const fs = require("fs");
+const dist = "/opt/calendarly/client/dist";
+const js = fs.readFileSync(dist + "/assets/index-BDiodzvu.js", "utf8");
+new vm.SourceTextModule(js);
+console.log("PARSE_OK bytes=" + js.length);
+const S = js.slice(js.indexOf("function wxGUI"), js.indexOf("function wsWS({"));
+console.log("rwInWxCard " + ((S.includes("n.jsx(rwRV") && S.includes("zoom: 11") && S.includes("lat: 28.817422") && S.includes("lon: -81.620514") && S.includes("ctl: !0") && S.includes("wgXScene")) ? 1 : 0));
+const R = js.slice(js.indexOf("function rwRV"), js.indexOf("// wxGUI"));
+console.log("capsNz " + (R.indexOf("|| 7, 3), 11)") >= 0) + " capsLz " + (R.indexOf("lz <= 11") >= 0) + " capsSet " + (R.indexOf(", 3), 11)") >= 0));
+console.log("old10 " + ((R.indexOf("|| 7, 3), 10)") >= 0 || R.indexOf("lz <= 10") >= 0 || R.indexOf(", 3), 10)") >= 0) ? "PRESENT" : "gone"));
+const html = fs.readFileSync(dist + "/index.html", "utf8");
+console.log("marker v=" + (html.match(/v=([a-z0-9]+)/) || [])[1]);
+console.log("VERIFY_NODE_DONE");

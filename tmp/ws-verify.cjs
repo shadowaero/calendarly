@@ -1,0 +1,10 @@
+const fs = require('fs');
+const c = fs.readFileSync('wave4/fd_weather/ws-widgets.js', 'utf8');
+console.log('WX_SVGconst:', c.includes('const WX_SVG = {'));
+console.log('quotedKey:', c.includes("'clear-day': '<svg"));
+console.log('WS_CSS:', c.includes('const WS_CSS ='));
+console.log('wsTile:', c.includes('function wsTile'));
+console.log('markerGone:', !c.includes('__WXSVG__'));
+console.log('iconRefs:', (c.match(/WX_SVG\[/g) || []).length);
+console.log('keys:', (c.match(/'([a-z-]+)': '<svg/g) || []).map(s => s.split("'")[1]).join(','));
+console.log('size:', c.length);

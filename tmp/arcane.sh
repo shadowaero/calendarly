@@ -1,0 +1,6 @@
+#!/bin/bash
+# RECON runner for project 'arcane' (from DXP inspect 2026-10-11)
+docker network inspect 'nginx_default' >/dev/null 2>&1 || docker network create 'nginx_default'
+docker run -d --name 'arcane' --restart 'unless-stopped' --network-alias 'arcane' --user '0:0' --env 'SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt' --env 'ENVIRONMENT=production' --env 'GIN_MODE=release' --env 'PORT=3552' --env 'APP_URL=https://arcane.examininglife.com' --env 'PUID=999' --env 'TZ=America/New_York' --env 'DATABASE_URL=file:data/arcane.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(2500)&_txlock=immediate' --env 'ENCRYPTION_KEY=ppYj2lSCWNE2ao/keWTn59CzvZIVmNcsMsP9F+u/+J0=' --env 'PROJECTS_DIRECTORY=/volume1/docker' --env 'PGID=10' --env 'JWT_SECRET=F8EIHnWw9bBMoG3Vsy3J9rNI+QT/1zOw0/kSRNhbQ+0=' --env 'NODE_ENV=production' --publish '3552:3552/tcp' --volume '/volume1/docker/arcane/data:/app/data' --volume '/var/run/docker.sock:/var/run/docker.sock:ro' --volume '/volume1/docker:/volume1/docker' --network 'nginx_default' './arcane'
+docker network connect 'nginx_default' 'arcane' 2>/dev/null || true
+echo RUNNER-DONE-arcane

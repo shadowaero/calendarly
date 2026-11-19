@@ -1,0 +1,6 @@
+#!/bin/bash
+# RECON runner for project 'scrutiny' (from DXP inspect 2026-10-11)
+docker network inspect 'scrutiny_default' >/dev/null 2>&1 || docker network create 'scrutiny_default'
+docker run -d --name 'scrutiny' --restart 'unless-stopped' --cap-add CAP_SYS_ADMIN --cap-add CAP_SYS_RAWIO --network-alias 'scrutiny' --device '/dev/sda:/dev/sda' --device '/dev/sdb:/dev/sdb' --device '/dev/sdc:/dev/sdc' --device '/dev/sdd:/dev/sdd' --device '/dev/sde:/dev/sde' --device '/dev/sdf:/dev/sdf' --device '/dev/sdg:/dev/sdg' --device '/dev/sdh:/dev/sdh' --device '/dev/nvme0n1:/dev/nvme0n1' --device '/dev/nvme1n1:/dev/nvme1n1' --device '/dev/nvme2n1:/dev/nvme2n1' --env 'INFLUXD_CONFIG_PATH=/opt/scrutiny/influxdb' --env 'S6VER=3.1.6.2' --env 'INFLUXVER=2.9.1-1' --env 'INFLUXD_USE_HASHED_TOKENS=false' --env 'S6_SERVICES_READYTIME=1000' --env 'TZ=America/New_York' --publish '8082:8080/tcp' --volume '/volume1/docker/scrutiny/config:/opt/scrutiny/config' --volume '/volume1/docker/scrutiny/influxdb:/opt/scrutiny/influxdb' --volume '/run/udev:/run/udev:ro' --network 'scrutiny_default' --entrypoint '/init' ghcr.io/starosdev/scrutiny:latest
+docker network connect 'scrutiny_default' 'scrutiny' 2>/dev/null || true
+echo RUNNER-DONE-scrutiny

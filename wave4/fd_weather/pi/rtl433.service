@@ -1,0 +1,11 @@
+[Unit]
+Description=rtl_433 SDR receiver for AcuRite 433MHz sensors
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/rtl_433 -M level -F json:/var/run/rtl433.json -f 433.92M
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

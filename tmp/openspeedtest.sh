@@ -1,0 +1,7 @@
+#!/bin/bash
+# RECON runner for project 'openspeedtest' (from DXP inspect 2026-10-11)
+docker network inspect 'bridge' >/dev/null 2>&1 || docker network create 'bridge'
+docker volume inspect 'ead11498f66ca5c6cb79c4031055fc3ae7be63a29a60815d4b2d6921009c9eff' >/dev/null 2>&1 || docker volume create 'ead11498f66ca5c6cb79c4031055fc3ae7be63a29a60815d4b2d6921009c9eff'  # DATA: migrate separately
+docker run -d --name 'openspeedtest' --restart 'always' --network-alias 'speedtest' --user '101' --env 'NGINX_VERSION=1.26.2' --env 'PKG_RELEASE=1' --env 'DYNPKG_RELEASE=2' --env 'NJS_VERSION=0.8.5' --env 'NJS_RELEASE=1' --env 'ENABLE_LETSENCRYPT=false' --env 'DOMAIN_NAME=false' --env 'USER_EMAIL=false' --env 'CONFIG=/etc/nginx/conf.d/OpenSpeedTest-Server.conf' --env 'INDEX_HTML=/usr/share/nginx/html/index.html' --env 'CHANGE_CONTAINER_PORTS=false' --env 'HTTP_PORT=3000' --env 'HTTPS_PORT=3001' --env 'SET_USER=101' --publish '3020:3000/tcp' --publish '3004:3001/tcp' --volume 'ead11498f66ca5c6cb79c4031055fc3ae7be63a29a60815d4b2d6921009c9eff:/var/log/letsencrypt' --network 'bridge' --entrypoint '/docker-entrypoint.sh' '/entrypoint.sh'
+docker network connect 'bridge' 'openspeedtest' 2>/dev/null || true
+echo RUNNER-DONE-openspeedtest

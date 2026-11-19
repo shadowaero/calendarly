@@ -1,0 +1,10 @@
+const fs = require('fs');
+const js = fs.readFileSync('tmp/fdclient/index-BDiodzvu.js', 'utf8');
+console.log('bytes', js.length);
+console.log('wxGUI', js.includes('function wxGUI'));
+console.log('weather_gui case', js.includes('case"weather_gui"'));
+console.log('wgform', js.includes('Weather GUI Config'));
+console.log('ver', (js.match(/const jsVer/g), (js.match(/v=ws6[a-z]/g) || []).join(',')));
+const p = js.indexOf('x.type==="radar_block"&&');
+console.log('RADAR_FORM:');
+console.log(js.slice(p, p + 2200).replace(/\n/g, ' '));
