@@ -1,5 +1,6 @@
 // rwRV — standalone RainViewer radar block (RainViewer public API animated over dark OSM base; resizable via block size)
-// Timeline (rvT30): the last ~30 min of radar + RainViewer's nowcast forecast, always playing FORWARD
+// Timeline (rvT30): the last ~30 min of radar + RainViewer's nowcast forecast (or last ~50 min of
+// past while the free API serves an empty nowcast), always playing FORWARD
 // in time (oldest -> now -> forecast, then wraps). Future frames get an "FCST +Nm" badge by the clock.
 // config keys: lat, lon, zoom (3-11, default 7), color (palette id), label, pause (1 = freeze frame), ctl (1 = +/- zoom buttons + two-finger pinch on the map; zoom persists per label in localStorage)
 function rwRV(props) {
@@ -30,10 +31,12 @@ function rwRV(props) {
     const pull = function () { fetch('https://api.rainviewer.com/public/weather-maps.json').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setRvData(j); }).catch(function () { if (!dead) setRvData(null); }); };
     pull(); const iv = setInterval(pull, 300000); return function () { dead = true; clearInterval(iv); };
   }, []);
-  // rvT30 — timeline: last ~4 past frames (~30 min of trend) + RainViewer's nowcast forecast frames
-  // (the public API only forecasts ~+30 min ahead). Older frames are deliberately dropped: the kiosk
-  // wants "recent trend -> what's coming", not a two-hour history replay.
-  const rvFrames = (rvData && rvData.radar) ? (rvData.radar.past || []).slice(-4).concat(rvData.radar.nowcast || []) : [];
+  // rvT30 — timeline: when RainViewer serves nowcast frames, the last ~4 past frames (~30 min of
+  // trend) + the FCST frames (the public API only forecasts ~+30 min ahead). While RainViewer's
+  // free nowcast comes back EMPTY (it does, intermittently), widen to the last ~6 past frames
+  // (~50 min at the 10-min cadence) so the deck still spans the full window.
+  const rvNC = (rvData && rvData.radar && rvData.radar.nowcast) ? rvData.radar.nowcast : [];
+  const rvFrames = (rvData && rvData.radar) ? (rvData.radar.past || []).slice(rvNC.length ? -4 : -6).concat(rvNC) : [];
   // rvXF v2 — crossfade + forward-only radar loop. Two stacked overlay layers: the outgoing frame
   // stays painted while the incoming one fades in over it ('opacity .48s linear'), every frame's
   // tiles are prefetched (rvPL), and the playhead (rvPP) always steps forward — 30 min of radar
