@@ -11,6 +11,7 @@ The deployed devices run **downstream, patched copies** of this repo:
 |---|---|---|
 | **Pi 4 kiosk** (`ssh pi4kiosk`) | patched dist at `/opt/calendarly/client/dist` + SQLite at `/opt/calendarly/data` | pair of patchers in `wave4/fd_weather/` |
 | **NAS** (`ShadowAero@192.168.76.188`) | patched dist inside docker container `family-dashboard` (`/app/client/dist`) | `fdw-apply-radar-nas.cjs` (marker-free variant) |
+| **Public** (`https://calendar.examininglife.com`) | **same as the Pi 4 kiosk** — authentik SSO in front; nginx-proxy-manager (NAS) host 104 forwards to `http://192.168.76.36:3000` | re-pointed 2026-11-19; rollback = `104.conf.bak-cal-pi-20261119` inside the NPM container |
 
 - All kiosk-side code changes (weather kit, radar comps, zoom caps, `jsVer=ws6z`) live in **`wave4/fd_weather/`** — **see [`wave4/fd_weather/DEPLOY-NOTES.md`](wave4/fd_weather/DEPLOY-NOTES.md) for the authoritative status, exact baselines, rollback recipes and verify scripts**. This README documents the pristine source, not the deployed state.
 - ⚠️ **Rebuilding `client/dist` from this source produces a fresh, unpatched bundle** (the patches live outside `client/src`). After any rebuild you must re-run the patchers — Pi pair then NAS variant — before those devices reflect the new build.
