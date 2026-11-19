@@ -2,6 +2,20 @@
 
 A self-hosted, real-time family command center and DAKboard replacement built for containerized deployment on NAS hosts (such as IDX6011 Pro) and multi-device clients (Raspberry Pi 4 with Elo Touchscreen, Raspberry Pi 5 Wall Display, and desktop/mobile browsers).
 
+
+## 🛠️ Kiosk Patch State (ws6z) — live devices vs. this source
+
+The deployed devices run **downstream, patched copies** of this repo:
+
+| Deploy target | What runs | Patch entry point |
+|---|---|---|
+| **Pi 4 kiosk** (`ssh pi4kiosk`) | patched dist at `/opt/calendarly/client/dist` + SQLite at `/opt/calendarly/data` | pair of patchers in `wave4/fd_weather/` |
+| **NAS** (`ShadowAero@192.168.76.188`) | patched dist inside docker container `family-dashboard` (`/app/client/dist`) | `fdw-apply-radar-nas.cjs` (marker-free variant) |
+
+- All kiosk-side code changes (weather kit, radar comps, zoom caps, `jsVer=ws6z`) live in **`wave4/fd_weather/`** — **see [`wave4/fd_weather/DEPLOY-NOTES.md`](wave4/fd_weather/DEPLOY-NOTES.md) for the authoritative status, exact baselines, rollback recipes and verify scripts**. This README documents the pristine source, not the deployed state.
+- ⚠️ **Rebuilding `client/dist` from this source produces a fresh, unpatched bundle** (the patches live outside `client/src`). After any rebuild you must re-run the patchers — Pi pair then NAS variant — before those devices reflect the new build.
+
+
 ---
 
 ## 🏗️ Architecture & Features
