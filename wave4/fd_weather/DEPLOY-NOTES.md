@@ -799,3 +799,14 @@ Three asks: fix the neon-green Chalkboard background, raise the radar zoom cap 1
 - **Deploy — Pi 4 kiosk:** files staged in `~/fdwship` via scp (no sudo needed); single sudo run `echo <pw> | sudo -p "" -S env FDW_TMP=/home/xxtoon/fdwship node ~/fdwship/fdw-apply-radar-widgets.cjs` → comp.inject **OK (old 16588B → new 17572B)**, cache.bust **?v=ws6zq → ws6zr**, guards 1× + wxGUI/wsTile intact, PARSE_OK, `ok:true`. `verify-wxgui6.sh` green (rwXF 1, rwCtl 1, rwInWxCard true, wsCases 18, wsTile 1, hurricane true; HTTP 200 incl. `bundle-ws6zr`; lightdm active). Live greps: slice_occ=1 hold_newest=1 fcst=3 nowstart=1 rvDir=0 xfade=2 step620=1.
 - **Browser impact:** every kiosk/public page must **reload** to pick up `?v=ws6zr` (old ws6z/ws6zq/ws6zp entries remain browser-stale only; no-store hardening from the previous record keeps edge caches out).
 - **Rollback:** `git revert` this comp commit → re-run both patchers with the prior comp (they re-inject by compBlock size/anchor check: “comps upgraded” path) → bump `jsVer` to the next free token (ws6zr is now burned). Password hygiene: Pi sudo was used once in-session via `-S` (shared in chat → rotate); not recorded on disk.
+
+- **Live kiosk check (post-relaunch 2026-11-19 ~15:07 ET; kiosk Chromium remotely relaunched with no keyboard:
+  pgrep -x chromium → kill, wipe Chromium caches Default/Cache + Code Cache + ShaderCache/GrShaderCache for a cold
+  index.html fetch, then setsid -f /home/xxtoon/kiosk.sh via SSH - new PID 2328):** timeline shows the designed
+  deck only as far back as data allows: last 4 x 10-min `past` frames (seen 2:30→3:00, then 2:40→3:10 as the API
+  refreshed). RainViewer’s free `radar.nowcast` was an EMPTY array (3 samples ~2.5 min apart; `past` updated 15:00
+  → 15:10 meanwhile) - so the FCST +Nm badge/frames are DATA-DEPENDENT: when RW publishes nowcast frames they
+  append automatically; while empty the deck is past-only and keeps the forward loop. Kiosk is Wayland/labwc
+  (no xdotool; keyboardless reload = kill+relaunch kiosk.sh, or sudo systemctl restart lightdm as fallback).
+  Ops gotcha: `pkill -f` self-matches the SSH session’s own command line and kills the session mid-command -
+  use `pgrep -x <name>` + `kill` instead. Relaunch log: pi:/tmp/kiosk-relaunch.log.
