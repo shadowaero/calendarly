@@ -1,25 +1,26 @@
-# Dependencies
-node_modules/
-
-# Build output
-dist/
-build/
-
-# Runtime data / database
-data/
-*.sqlite
-*.sqlite-wal
-*.sqlite-shm
-*.db
-
-# Uploads & backups
-photos/
-backups/
-
-# Environment
-.env
-.env.*
-
-# Logs & OS junk
-*.log
-.DS_Store
+# Multi-project workspace: keep ONLY the Calendarly app source (client/server/kiosk/deploy,
+# restored from the old GitHub history) + the FDW kiosk kit (wave4/fd_weather) + repo docs.
+/*
+!/SSH-ACCESS.md
+!/.gitignore
+!/README.md
+!/Dockerfile
+!/.dockerignore
+!/docker-compose.yml
+!/docker-compose.*.yml
+!/client
+!/server
+!/kiosk
+!/deploy
+!/wave4
+wave4/*
+!/wave4/fd_weather
+!/tmp
+tmp/*
+!tmp/*.cjs
+!tmp/*.sh
+!tmp/*.mjs
+!tmp/pi-v.js
+# build snapshots that should not be tracked
+tmp/pi-bundle.js
+tmp/index.server.js
