@@ -2,8 +2,8 @@
 // fdw-apply-eventedit.cjs — injects calendar event-editing kit into a deployed
 // vite bundle (in place, no rebuild; keeps all previously injected kits intact).
 // Token policy (matches radar patchers): the cache-bust token lives in index.html
-// only — this kit bumps ?v=ws6zv there (bundle carries no jsVer literal).
-// Chain: ws6zs → ws6zt (v1, shadowed-prop bug) → ws6zv (v2, editEv + ml-6) → ws6zv
+// only — this kit bumps ?v=ws6zx there (bundle carries no jsVer literal).
+// Chain: ws6zs → ws6zt (v1, shadowed-prop bug) → ws6zx (v2, editEv + ml-6) → ws6zx
 // (v3, timezone-correct prefill + timed-save true UTC).
 // usage: node --experimental-vm-modules fdw-apply-eventedit.cjs <index-*.js> [index.html]
 // Idempotent: skips if "Edit Family Event" already present. Backup: *.bak-eventedit
@@ -48,7 +48,11 @@ const edits = [
   // All-day branches untouched (their T00Z/T23:59Z raw-day convention is day-stable
   // and feeds day-grouping).
   ['const E=M?`${h}T00:00:00.000Z`:`${h}T${x}:00.000Z`,Q=M?`${h}T23:59:59.000Z`:`${h}T${x}:00.000Z`;',
-   'const E=M?`${h}T00:00:00.000Z`:new Date(`${h}T${x}:00`).toISOString(),Q=M?`${h}T23:59:59.000Z`:new Date(`${h}T${x}:00`).toISOString();']
+   'const E=M?`${h}T00:00:00.000Z`:new Date(`${h}T${x}:00`).toISOString(),Q=M?`${h}T23:59:59.000Z`:new Date(`${h}T${x}:00`).toISOString();'],
+  // E9 (v4): client ws handler ignored the server's EVT broadcast on PUT — add
+  // "EVENT_UPDATED" to the refresh list so every connected device refetches instantly.
+  ['if(["EVENT_CREATED","EVENT_DELETED","CALENDAR_SYNCED",',
+   'if(["EVENT_CREATED","EVENT_UPDATED","EVENT_DELETED","CALENDAR_SYNCED",']
 ];
 
 const report = [];
@@ -73,10 +77,10 @@ if (htmlPath && fs.existsSync(htmlPath)) {
   const hc = html.split('?v=ws6zs').length - 1;
   if (hc === 1) {
     fs.copyFileSync(htmlPath, htmlPath + '.bak-eventedit');
-    html = html.replace('?v=ws6zs', '?v=ws6zv');
+    html = html.replace('?v=ws6zs', '?v=ws6zx');
     fs.writeFileSync(htmlPath, html);
-    console.log('APPLY HTML OK ?v=ws6zv');
+    console.log('APPLY HTML OK ?v=ws6zx');
   } else {
-    console.log('HTML skip (q-count=' + hc + (html.includes('?v=ws6zv') ? ' already ws6zt' : '') + ') eol=' + (hEOL === '\r\n' ? 'CRLF' : 'LF'));
+    console.log('HTML skip (q-count=' + hc + (html.includes('?v=ws6zx') ? ' already ws6zt' : '') + ') eol=' + (hEOL === '\r\n' ? 'CRLF' : 'LF'));
   }
 }
