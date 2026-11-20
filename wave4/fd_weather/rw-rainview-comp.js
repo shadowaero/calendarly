@@ -1,6 +1,8 @@
 // rwRV — standalone RainViewer radar block (RainViewer public API animated over dark OSM base; resizable via block size)
-// Timeline (rvT30): the last ~80 min of radar + RainViewer's nowcast forecast (or the full ~2 h
-// of past while the free API serves an empty nowcast), always playing FORWARD
+// Timeline (rvT30): the last ~80 min of radar — at RainViewer's fixed 10-min publish cadence that
+// is its last 9 past frames (the free API serves nothing finer; the timeline re-pull below runs
+// every 5 min so a newly published frame appears within ≤5 min of going live) + RainViewer's
+// nowcast forecast when served, always playing FORWARD
 // in time (oldest -> now -> forecast, then wraps). Future frames get an "FCST +Nm" badge by the clock.
 // config keys: lat, lon, zoom (3-11, default 7), color (palette id), label, pause (1 = freeze frame), ctl (1 = +/- zoom buttons + two-finger pinch on the map; zoom persists per label in localStorage)
 function rwRV(props) {
@@ -31,13 +33,15 @@ function rwRV(props) {
     const pull = function () { fetch('https://api.rainviewer.com/public/weather-maps.json').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setRvData(j); }).catch(function () { if (!dead) setRvData(null); }); };
     pull(); const iv = setInterval(pull, 300000); return function () { dead = true; clearInterval(iv); };
   }, []);
-  // rvT30 (w7ad) — timeline: when RainViewer serves nowcast frames, the last ~10 past frames
-  // (~80 min of trend) + the FCST frames (the public API only forecasts ~+30 min ahead). While
-  // RainViewer's free nowcast comes back EMPTY (it does, intermittently), widen to the full
-  // ~13 past frames (~2 h at the 10-min cadence) so the deck still spans the full window;
-  // both branches land at ~13 frames (~9 s/loop) so the sweep stays long + smooth either way.
+  // rvT30 (ws7ag) — timeline: the LAST 9 past frames = ~1 h 20 m of sweep at the fixed 10-min
+  // cadence of RainViewer's free API (upstream publishes one frame every 10 min — nothing finer
+  // to pull; the timeline refetch below runs every 5 min, so new frames land within ≤5 min).
+  // The FCST frames concat on after when the free nowcast is served (~+30 min ahead). Was a
+  // 10-past/13-past split across nowcast states (ws7ad widening); 620 ms/step + 2-beat newest
+  // hold are unchanged, so the sweep pace stays — the loop simply runs shorter (~6.8 s without
+  // FCST, ~8.7 s with) and the tile prefetch drops from 13 to 9-12 frames.
   const rvNC = (rvData && rvData.radar && rvData.radar.nowcast) ? rvData.radar.nowcast : [];
-  const rvFrames = (rvData && rvData.radar) ? (rvData.radar.past || []).slice(rvNC.length ? -10 : -13).concat(rvNC) : [];
+  const rvFrames = (rvData && rvData.radar) ? (rvData.radar.past || []).slice(-9).concat(rvNC) : [];
   // rvXF v3 (w7ae) — full-dwell continuous blend + forward-only radar loop. Two stacked overlay
   // layers swap roles every step: the outgoing frame fades out while the incoming fades in
   // ('opacity .62s linear' = the whole 620 ms step), so the loop morphs continuously with no
@@ -49,7 +53,7 @@ function rwRV(props) {
   // start on the NOW frame (latest past frame in the trimmed timeline); rebuild when frames change
   b.useEffect(function () {
     if (!rvData || !rvData.radar) return;
-    const nPast = Math.min((rvData.radar.past || []).length, rvNC.length ? 10 : 13);
+    const nPast = Math.min((rvData.radar.past || []).length, 9);
     const L = rvFrames.length;
     const cur = nPast > 0 ? nPast - 1 : Math.max(0, L - 1);
     rvPos.current = cur; rvN.current = cur; rvK.current = 0; rvHold.current = 0;
