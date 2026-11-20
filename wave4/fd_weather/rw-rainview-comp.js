@@ -1,19 +1,35 @@
-// rwRV — standalone RainViewer radar block (RainViewer public API animated over dark OSM base; resizable via block size)
-// Timeline (rvT30): the last ~1 h of radar — at RainViewer's fixed 10-min publish cadence that
-// is its last 7 past frames (the free API serves nothing finer; the timeline re-pull below runs
-// every 5 min so a newly published frame appears within ≤5 min of going live) + RainViewer's
-// nowcast forecast when the free API generates it (its +30 min tail lives at radar.nowcast and
-// is UPSTREAM-INTERMITTENT: probed 2026-11-20 it returned 13 past frames but "nowcast":[] — the
-// concated tail reappears by itself the moment upstream serves frames again), always playing
-// FORWARD in time (oldest -> now -> forecast, then wraps). Future frames get an "FCST +Nm" badge.
+// rwRV — standalone radar deck (ws7aj): Rainbow Weather nowcast is PRIMARY (its Tiles API is the
+// guaranteed future radar), served through the local express proxy /radar/api so the subscription
+// key never leaves the server; the original RainViewer public-API deck stays untouched as an
+// AUTOMATIC fallback the moment the proxy health says otherwise (offline / quota-broken).
+// Timeline (ws7aj): Rainbow publishes its global frames at a fixed 10-min cadence but the
+// snapshot id IS NOT wall-clock (their published edge lags real time), so the deck takes the
+// snapshot from the proxy (/radar/api/snapshot — 1 upstream call, 2-min proxy cache, last-good
+// kept). Frame math at that snap is fully deterministic. Deck = the 7 past
+// frames at that cadence (the last hour) + ONE guaranteed Rainbow nowcast frame at +30 min
+// ("FCST +30m" badge; Rainbow guarantees nowcasts out to +4 h in 10-min steps — offsets
+// 600..14400 — if a longer tail is ever wanted, it is a one-line change). Playback (ws7ah)
+// engine kept: 620 ms beats, 1.24 s full-dwell crossfades, HUD clock in interpolated 5-min
+// stamps, 2-beat hold on the newest frame, forward-only loop (oldest -> now -> forecast, wraps).
+// Fallback (health = 0): RainViewer's last 7 past frames (1 h sweep at its 10-min publish
+// cadence, re-pulled every 5 min) + the free nowcast tail when upstream serves it
+// ("nowcast":[] is upstream-intermittent; the tail reappears by itself).
+// Palette: Rainbow tiles use color=0..9 (4 "Nexrad", 5 "Rainviewer", 8 = "RainViewer Universal
+// Blue"); the stored RainViewer palette id maps to the closest Rainbow one (RV2RBK below).
 // config keys: lat, lon, zoom (3-11, default 7), color (palette id), label, pause (1 = freeze frame), ctl (1 = +/- zoom buttons + two-finger pinch on the map; zoom persists per label in localStorage)
 function rwRV(props) {
   const a = (props && props.config) || {};
   const lat = isFinite(Number(a.lat)) ? Number(a.lat) : 28.817422;
   const lon = isFinite(Number(a.lon)) ? Number(a.lon) : -81.620514;
   const NZ = Math.min(Math.max(Math.round(Number(a.zoom)) || 7, 3), 11);
-  const COLRV = (a.color !== '' && a.color != null && isFinite(Number(a.color))) ? Number(a.color) : 6;
-  const rvLabel = a.label || 'RAINVIEWER RADAR';
+  // color semantics (ws7aj): config.rainbowP = 1 => a.color is ALREADY a Rainbow palette id
+  // (blocks edited after the fork); otherwise a.color is a legacy RainViewer id mapped through
+  // RV2RBK (the wall's stored 6 = RV "Dark Sky" -> Rainbow 8 "Universal Blue").
+  const RV2RBK = { 0: 0, 1: 1, 2: 8, 3: 2, 4: 6, 5: 5, 6: 8, 7: 7, 8: 9, 9: 4 };
+  const cc0 = (a.color !== '' && a.color != null && isFinite(Number(a.color))) ? Math.max(0, Math.min(9, Number(a.color))) : null;
+  const COLRV = (cc0 != null) ? cc0 : 6;
+  const COLRB = ((cc0 != null) && (a.rainbowP === 1)) ? cc0 : ((RV2RBK[(cc0 != null) ? cc0 : 6] != null) ? RV2RBK[(cc0 != null) ? cc0 : 6] : 8);
+  const rvLabel = a.label || 'RAINBOW NOWCAST';
   const PAUSE = (a.pause === true || Number(a.pause) === 1);
   const CTL = (a.ctl === true || Number(a.ctl) === 1);
   let rvZ0 = NZ;
@@ -25,6 +41,35 @@ function rwRV(props) {
   const pvMove = function (e) { if (!CTL || rvPinch.current == null || !e.touches || e.touches.length !== 2) return; const dx = e.touches[0].clientX - e.touches[1].clientX, dy = e.touches[0].clientY - e.touches[1].clientY; const d = Math.sqrt(dx * dx + dy * dy); const r = d / rvPinch.current; if (r > 1.35) { rvSet(rvZoom + 1); rvPinch.current = d; } else if (r < 0.74) { rvSet(rvZoom - 1); rvPinch.current = d; } };
   const pvEnd = function () { rvPinch.current = null; };
   const rvD = b.useState(null); const rvData = rvD[0]; const setRvData = rvD[1];
+  // ws7aj state: rbkOK = proxy health (null unknown / 1 ok / 0 down), rbkSnap = { s, f } with the
+  // AUTHORED edge snapshot (proxy-served from Rainbow's snapshot endpoint; the published edge is
+  // NOT wall-clock — it lags real time — so the deck never derives it locally; the proxy caches
+  // it for 2 min and keeps the last good) and its 8-frame deck; refreshed every 2 min.
+  const rbkH = b.useState(null); const rbkOK = rbkH[0]; const setRbkOK = rbkH[1];
+  const rbkM = b.useState(null); const rbkSnap = rbkM[0]; const setRbkSnap = rbkM[1];
+  b.useEffect(function () {
+    let dead = false;
+    const hp = function () { fetch('/radar/api/health', { cache: 'no-store' }).then(function (r) { if (!dead) setRbkOK(r.ok ? 1 : 0); }).catch(function () { if (!dead) setRbkOK(0); }); };
+    hp(); const iv = setInterval(hp, 120000); return function () { dead = true; clearInterval(iv); };
+  }, []);
+  b.useEffect(function () {
+    let dead = false;
+    const rbkBuild = function (s) {
+      const fr = [];
+      for (let K2 = 6; K2 >= 1; K2--) fr.push({ time: s - K2 * 600, s: s - K2 * 600, o: 0, rbk: 1, path: 'rbk' + K2 });
+      fr.push({ time: s, s: s, o: 0, rbk: 1, path: 'rbk0' });
+      fr.push({ time: s + 1800, s: s, o: 1800, rbk: 1, path: 'rbkF' });
+      return { s: s, f: fr };
+    };
+    const tk = function () {
+      if (dead) return;
+      fetch('/radar/api/snapshot', { cache: 'no-store' }).then(function (r2) { return r2.ok ? r2.json() : Promise.reject(new Error('http ' + r2.status)); }).then(function (j2) {
+        if (dead || !j2 || !j2.snapshot) return;
+        setRbkSnap(function (old) { return (old && old.s === j2.snapshot) ? old : rbkBuild(j2.snapshot); });
+      }).catch(function () {});
+    };
+    tk(); const iv2 = setInterval(tk, 120000); return function () { dead = true; clearInterval(iv2); };
+  }, []);
   // rvBuffer: n = frame index painted on the front layer, o = on the back layer, k = which layer is front
   const rvB = b.useState({ n: -1, o: -1, k: 0 }); const rvBuf = rvB[0]; const setBuf = rvB[1];
   const rvP = b.useState(!PAUSE); const rvPlay = rvP[0]; const setRvPlay = rvP[1];
@@ -39,18 +84,22 @@ function rwRV(props) {
     const pull = function () { fetch('https://api.rainviewer.com/public/weather-maps.json').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setRvData(j); }).catch(function () { if (!dead) setRvData(null); }); };
     pull(); const iv = setInterval(pull, 300000); return function () { dead = true; clearInterval(iv); };
   }, []);
-  // rvT30 (ws7ai) — timeline: the LAST 7 past frames = 1 h of sweep at the fixed 10-min
-  // cadence of RainViewer's free API (upstream publishes one frame every 10 min — nothing finer
-  // to pull; the timeline refetch below runs every 5 min, so new frames land within ≤5 min).
-  // The FCST frames concat on after when the free nowcast is served (the +30 min tail: +10/+20/+30;
-  // probed 2026-11-20 weather-maps.json served 13 past frames but "nowcast":[] — upstream-
-  // intermittent, the tail appears by itself when frames return). Wall: 80 min (ws7ag) -> 60 min.
+  // ws7aj timeline: Rainbow mode (proxy healthy) = the derived 8-frame deck — 7 past frames at
+  // the fixed 10-min cadence + the guaranteed nowcast frame at +30 min; Rainbow guarantees
+  // nowcasts to +4 h in 10-min steps (offset 600..14400) if a longer FCST tail is ever wanted.
+  // Fallback mode (rbkOK 0/ null, or no data yet): the original RainViewer deck — the last 7
+  // past frames (1 h sweep at RainViewer's 10-min publish cadence; the timeline refetch below
+  // runs every 5 min so new frames land within ≤5 min) + the free +30 min nowcast tail when
+  // upstream serves it (probed 2026-11-20 weather-maps.json even served "nowcast":[] — the tail
+  // appears by itself when frames return). Wall: 1 h + FCST in both modes.
   // Playback (ws7ah) halves the perceived step: each crossfade spans TWO 620 ms beats and the
   // HUD clock ticks in interpolated 5-min stamps (midpoint beats), so the sweep reads like
   // RainViewer's site — motion stays continuous; the loop runs ~9.9 s without FCST, ~13.6 s
   // with, and the tile prefetch stays 7-10 frames.
   const rvNC = (rvData && rvData.radar && rvData.radar.nowcast) ? rvData.radar.nowcast : [];
-  const rvFrames = (rvData && rvData.radar) ? (rvData.radar.past || []).slice(-7).concat(rvNC) : [];
+  const rvRBK = (rbkOK === 1 && rbkSnap);
+  const rvFrames = (rvRBK && rbkSnap) ? rbkSnap.f : (rvData && rvData.radar) ? (rvData.radar.past || []).slice(-7).concat(rvNC) : [];
+  rvFrames.np = (rvRBK && rbkSnap) ? 7 : Math.min((rvData && rvData.radar && rvData.radar.past || []).length, 7);
   // rvXF v4 (ws7ah) — full-dwell continuous blend + forward-only radar loop. Two stacked overlay
   // layers swap roles every second 620 ms beat: the outgoing frame fades out while the incoming
   // fades in ('opacity 1.24s linear' = the whole 2-beat crossfade), so the loop morphs
@@ -60,16 +109,17 @@ function rwRV(props) {
   const rvPos = b.useRef(-1); const rvHold = b.useRef(0);
   const rvN = b.useRef(-1); const rvK = b.useRef(0); const rvPre = b.useRef([]);
   const rvBeat = b.useRef(0); const rvPrev = b.useRef(-1);
-  // start on the NOW frame (latest past frame in the trimmed timeline); rebuild when frames change
+  // start on the NOW frame (latest past frame in the current deck); rebuild when the source
+  // flips (proxy health) or a new Rainbow snapshot rolls — same-snapshot recomputes are no-ops
   b.useEffect(function () {
-    if (!rvData || !rvData.radar) return;
-    const nPast = Math.min((rvData.radar.past || []).length, 7);
     const L = rvFrames.length;
+    if (!L) return;
+    const nPast = Math.min(rvFrames.np || 7, L - 1);
     const cur = nPast > 0 ? nPast - 1 : Math.max(0, L - 1);
     rvPos.current = cur; rvN.current = cur; rvK.current = 0; rvHold.current = 0; rvBeat.current = 0;
     setBuf({ n: cur, o: cur, k: 0 });
     rvsT(0);
-  }, [rvData]);
+  }, [rvData, rbkSnap, rbkOK]);
   // rvPP (ws7ah) — forward-only playback with the interpolated clock: every second 620 ms beat
   // flips the layers and starts the next 1.24 s crossfade (HUD = outgoing frame's time); the
   // alternate mid beat only advances the HUD to the midpoint stamp between the two blending real
@@ -98,7 +148,7 @@ function rwRV(props) {
       setBuf({ n: p, o: rvPrev.current, k: rvK.current });
     }, 620);
     return function () { clearInterval(t); };
-  }, [rvPlay, rvData]);
+  }, [rvPlay, rbkSnap, rbkOK, rvData]);
   b.useEffect(function () {
     const el = rvRef.current; if (!el) return;
     const upd = function () { setRvBox({ w: el.clientWidth || 0, h: el.clientHeight || 0 }); };
@@ -153,16 +203,25 @@ function rwRV(props) {
     if (ty < 0 || ty >= nTo) continue;
     rvTiles.push({ wx: ((tx % nTo) + nTo) % nTo, y: ty, tx: tx, key: 'rvt' + tx + '_' + ty });
   } }
+  // frUrl (ws7aj): one URL builder for both sources — Rainbow frames go through the local express
+  // proxy (/radar/api/tiles/v1/precip-global/{snap}/{off}/{z}/{x}/{y}?color=N; key injected by
+  // the server, tiles disk-cached) while RainViewer fallback frames keep the public tilecache
+  // scheme (host + path + size/zoom/tile/palette/1_1.png).
+  const frUrl = function (f, x, y) {
+    if (!f) return '';
+    if (f.rbk) return '/radar/api/tiles/v1/precip-global/' + f.s + '/' + f.o + '/' + OZ + '/' + x + '/' + y + '?color=' + COLRB;
+    return (rvData && rvData.host) ? rvData.host + f.path + '/' + TS + '/' + OZ + '/' + x + '/' + y + '/' + COLRV + '/1_1.png' : '';
+  };
   // rvPL — prefetch every overlay tile of every frame once, so crossfades never wait on the network
   b.useEffect(function () {
-    if (!rvData || !rvData.host || rvBox.w < 2 || rvTiles.length === 0 || rvFrames.length === 0) return;
+    if (rvBox.w < 2 || rvTiles.length === 0 || rvFrames.length === 0) return;
     const ims = [];
     for (let F = 0; F < rvFrames.length; F++) {
-      const f = rvFrames[F]; if (!f || !f.path) continue;
-      for (let T = 0; T < rvTiles.length; T++) { const t = rvTiles[T]; try { const im = new Image(); im.src = rvData.host + f.path + '/' + TS + '/' + OZ + '/' + t.wx + '/' + t.y + '/' + COLRV + '/1_1.png'; ims.push(im); } catch (e) {} }
+      const f = rvFrames[F]; if (!f) continue;
+      for (let T = 0; T < rvTiles.length; T++) { const t = rvTiles[T]; try { const u2 = frUrl(f, t.wx, t.y); if (u2) { const im = new Image(); im.src = u2; ims.push(im); } } catch (e) {} }
     }
     rvPre.current = ims;
-  }, [rvData, rvZoom, rvBox.w, rvBox.h]);
+  }, [rvData, rbkSnap, rbkOK, rvZoom, rvBox.w, rvBox.h]);
   const rvShowT = rvStT || (rvFrame && rvFrame.time ? rvFrame.time : 0);
   const rvTime = rvShowT ? new Date(rvShowT * 1000) : null;
   const rvTimeStr = rvTime ? (((rvTime.getHours() % 12) === 0 ? 12 : rvTime.getHours() % 12) + ':' + (rvTime.getMinutes() < 10 ? '0' : '') + rvTime.getMinutes() + (rvTime.getHours() < 12 ? ' AM' : ' PM')) : '';
@@ -195,7 +254,7 @@ function rwRV(props) {
         const f = (fi >= 0 && rvFrames.length > 0) ? rvFrames[Math.min(fi, rvFrames.length - 1)] : null;
         return n.jsxs('div', { style: { position: 'absolute', left: 0, top: 0, opacity: rvBuf.k === K ? 1 : 0, transition: 'opacity 1.24s linear', pointerEvents: 'none' }, children: [n.jsxs('div', { style: { position: 'absolute', left: (halfW - cpxO * OV) + 'px', top: (halfH - cpyO * OV) + 'px', transform: 'scale(' + OV + ')', transformOrigin: '0 0', width: '1px', height: '1px' }, children: [rvTiles.map(function (t) {
           return n.jsxs('div', { style: { position: 'absolute', left: t.tx * TS + 'px', top: t.y * TS + 'px', width: TS + 'px', height: TS + 'px' }, children: [
-            (f && rvData && rvData.host) ? n.jsx('div', { style: { position: 'absolute', left: 0, top: 0, width: TS + 'px', height: TS + 'px', backgroundImage: 'url(' + rvData.host + f.path + '/' + TS + '/' + OZ + '/' + t.wx + '/' + t.y + '/' + COLRV + '/1_1.png)', backgroundSize: '256px 256px', pointerEvents: 'none' } }, 'fr' + fi + 'L' + K) : null
+            (f && frUrl(f, t.wx, t.y)) ? n.jsx('div', { style: { position: 'absolute', left: 0, top: 0, width: TS + 'px', height: TS + 'px', backgroundImage: 'url(' + frUrl(f, t.wx, t.y) + ')', backgroundSize: '256px 256px', pointerEvents: 'none' } }, 'fr' + fi + 'L' + K) : null
           ] }, t.key + 'L' + K);
         })] })] }, 'rvLy' + K);
       }),
@@ -212,7 +271,7 @@ function rwRV(props) {
         n.jsx('span', { style: { position: 'absolute', left: 14, top: 10, fontSize: 8, fontWeight: 800, letterSpacing: '.12em', color: '#fff', background: 'rgba(10,8,18,.72)', border: '1px solid rgba(255,43,214,.65)', borderRadius: 6, padding: '1px 5px', boxShadow: '0 1px 3px rgba(0,0,0,.8)', whiteSpace: 'nowrap' }, children: 'HOME' })
       ] })
     ] }) : null }),
-    n.jsx('div', { style: { padding: '3px 12px 6px', fontSize: '7.5pt', color: 'rgba(147,167,192,.65)', textAlign: 'right', flexShrink: 0 }, children: '\u00A9 OpenStreetMap \u00B7 RainViewer' })
+    n.jsx('div', { style: { padding: '3px 12px 6px', fontSize: '7.5pt', color: 'rgba(147,167,192,.65)', textAlign: 'right', flexShrink: 0 }, children: '\u00A9 OpenStreetMap \u00B7 Rainbow Weather (fallback: RainViewer)' })
   ] });
 }
 

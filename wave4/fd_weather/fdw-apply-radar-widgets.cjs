@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// FD radar-widgets patcher rvT30 (?v=ws7ai). Runs on the Pi: sudo node /tmp/fdw-apply-radar-widgets.cjs
+// FD radar-widgets patcher rbT30 (?v=ws7aj). Runs on the Pi: sudo node /tmp/fdw-apply-radar-widgets.cjs
 // Adds two resizable radar block types for screens studio: "radar_windy" (Windy iframe embed)
 // and "radar_rainviewer" (RainViewer public API over dark OSM base). Injects components right
 // BEFORE the `// wxGUI` marker (so the wxgui patcher's upgrade slice never deletes them), plus
@@ -8,7 +8,7 @@
 // Rollback: cp orig7.<name> <name> + restart lightdm.
 const fs = require('fs');
 const path = require('path');
-const jsVer = 'ws7ai';
+const jsVer = 'ws7aj';
 const report = { steps: [], ok: true };
 const step = (name, status, extra) => { report.steps.push({ name, status, extra }); console.log('[' + status + '] ' + name + (extra ? ' :: ' + extra : '')); if (status === 'FAIL') report.ok = false; };
 const dist = process.env.FDW_DIST || '/opt/calendarly/client/dist';
@@ -60,8 +60,8 @@ const caseAdd = 'case"radar_windy":return n.jsx("div",{className:`${H} p-0.5`,st
   'case"radar_rainviewer":return n.jsx("div",{className:`${H}`,style:I,children:n.jsx(rwRV,{config:_,fontFamilyClass:k})});' +
   caseAnchor;
 one('case.inject', 'case"radar_windy":return n.jsx', caseAnchor, caseAdd);
-// ---- admin label + add buttons ----
-one('label.inject', 'case"radar_rainviewer":return"Radar: RainViewer"',
+// ---- admin label + add buttons ---- (legacy-fresh path only: SKIPs once any radar_rainviewer label exists)
+one('label.inject', 'case"radar_rainviewer":return',
   'case"radar_block":return"Weather Radar";',
   'case"radar_block":return"Weather Radar";case"radar_rainviewer":return"Radar: RainViewer";case"radar_windy":return"Radar: Windy";');
 const radarBtn = 'n.jsx("button",{type:"button",onClick:()=>o("radar_block"),className:"px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold",children:"+ Radar"}),';
@@ -97,6 +97,13 @@ const rvForm = 'x.type==="radar_rainviewer"&&n.jsxs("div",{className:"flex flex-
 one('form.inject', 'x.type==="radar_windy"&&',
   'x.type==="radar_block"&&n.jsxs("div",{className:"flex flex-col gap-1.5 border-t border-slate-800 pt-1.5"',
   windyForm + rvForm + 'x.type==="radar_block"&&n.jsxs("div",{className:"flex flex-col gap-1.5 border-t border-slate-800 pt-1.5"');
+// ws7aj — upgrade pass for previous-wave deployed bundles: the deployed form block came from the
+// previous wave, so replace its piece-parts (title, palette selector, admin label) in place;
+// reruns SKIP on the new markers. Fresh bundles get the old form injected then upgraded.
+one('rainbow.formTitle', 'children:"Rainbow Radar Config"', 'children:"RainViewer Radar Config"', 'children:"Rainbow Radar Config"');
+one('rainbow.palette', 'rainbowP:1', '(x.config||{}).color??6,onChange:L=>p(h,{color:Number(L.target.value)})', '(x.config||{}).color??8,onChange:L=>p(h,{color:Number(L.target.value),rainbowP:1})');
+one('rainbow.opts', 'value:4,children:"Nexrad"', 'children:[n.jsx("option",{value:6,children:"Dark Sky"}),n.jsx("option",{value:8,children:"Dark Sky Alt"}),n.jsx("option",{value:4,children:"Rainbow"}),n.jsx("option",{value:2,children:"Universal Blue"}),n.jsx("option",{value:0,children:"Classic"}),n.jsx("option",{value:3,children:"Titan"})]', 'children:[n.jsx("option",{value:8,children:"Universal Blue"}),n.jsx("option",{value:4,children:"Nexrad"}),n.jsx("option",{value:5,children:"Rainviewer"}),n.jsx("option",{value:0,children:"Semi-Classic"}),n.jsx("option",{value:1,children:"Original"}),n.jsx("option",{value:2,children:"Rainbow SELEX"}),n.jsx("option",{value:3,children:"Titan"}),n.jsx("option",{value:6,children:"Palette 6"}),n.jsx("option",{value:7,children:"Palette 7"}),n.jsx("option",{value:9,children:"Palette 9"})]');
+one('rainbow.label', 'return"Radar: Rainbow"', 'case"radar_rainviewer":return"Radar: RainViewer"', 'case"radar_rainviewer":return"Radar: Rainbow"');
 // ---- cache bust + guards + parse + write ----
 const vi = html.indexOf(mjs[1] + '?v=');
 if (vi >= 0) { if (ver !== jsVer) html = html.replace(mjs[1] + '?v=' + ver, mjs[1] + '?v=' + jsVer); step('cache.bust', 'OK', '?v=' + (ver || 'none') + ' -> ?v=' + jsVer); }
@@ -106,7 +113,7 @@ const gw = (js.match(/function rwWindy/g) || []).length;
 const gv = (js.match(/function rwRV/g) || []).length;
 const gcw = (js.match(/case"radar_windy":return n\.jsx/g) || []).length;
 const gcv = (js.match(/case"radar_rainviewer":return n\.jsx/g) || []).length;
-const glw = (js.match(/case"radar_rainviewer":return"Radar: RainViewer"/g) || []).length;
+const glw = (js.match(/case"radar_rainviewer":return"Radar: (Rainbow|RainViewer)"/g) || []).length;
 const gbw = (js.match(/children:"\+ Windy"/g) || []).length;
 const gbv = (js.match(/children:"\+ RainView"/g) || []).length;
 const gfw = (js.match(/x\.type==="radar_windy"&&/g) || []).length;

@@ -17,6 +17,7 @@ import photosRouter, { PHOTOS_DIR } from './routes/photos.js';
 import authRouter from './routes/auth.js';
 import aiRouter from './routes/ai.js';
 import { writeAutoBackup } from './backup.js';
+import radarRouter from './routes/radar.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,6 +50,9 @@ app.use('/api', aiRouter);
 
 // Serve uploaded photos (persisted in DATA_DIR/photos)
 app.use('/photos', express.static(PHOTOS_DIR));
+
+// Rainbow Weather tile proxy (ws7aj) — injects keys + disk cache; see routes/radar.js
+app.use('/radar/api', radarRouter);
 
 // Weather & System status proxy helper (optional external widget data)
 app.get('/api/status', (req, res) => {
