@@ -28,50 +28,71 @@ function rwRV(props) {
   const rvP = b.useState(!PAUSE); const rvPlay = rvP[0]; const setRvPlay = rvP[1];
   const rvM = b.useState({ w: 0, h: 0 }); const rvBox = rvM[0]; const setRvBox = rvM[1];
   const rvRef = b.useRef(null);
+  // rvClock (ws7ah): HUD timestamp = the time the visible blend represents. Flip beats keep the
+  // outgoing real frame's time; mid beats show the interpolated 5-min stamp (0 falls back to
+  // rvFrame.time, so the initial render and PAUSE always show a real frame).
+  const rvS = b.useState(0); const rvStT = rvS[0]; const rvsT = rvS[1];
   b.useEffect(function () {
     let dead = false;
     const pull = function () { fetch('https://api.rainviewer.com/public/weather-maps.json').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setRvData(j); }).catch(function () { if (!dead) setRvData(null); }); };
     pull(); const iv = setInterval(pull, 300000); return function () { dead = true; clearInterval(iv); };
   }, []);
-  // rvT30 (ws7ag) — timeline: the LAST 9 past frames = ~1 h 20 m of sweep at the fixed 10-min
+  // rvT30 (ws7ah) — timeline: the LAST 9 past frames = ~1 h 20 m of sweep at the fixed 10-min
   // cadence of RainViewer's free API (upstream publishes one frame every 10 min — nothing finer
   // to pull; the timeline refetch below runs every 5 min, so new frames land within ≤5 min).
   // The FCST frames concat on after when the free nowcast is served (~+30 min ahead). Was a
-  // 10-past/13-past split across nowcast states (ws7ad widening); 620 ms/step + 2-beat newest
-  // hold are unchanged, so the sweep pace stays — the loop simply runs shorter (~6.8 s without
-  // FCST, ~8.7 s with) and the tile prefetch drops from 13 to 9-12 frames.
+  // 10-past/13-past split across nowcast states (ws7ad widening). Playback (ws7ah) halves the
+  // perceived step: each crossfade now spans TWO 620 ms beats and the HUD clock ticks in
+  // interpolated 5-min stamps (midpoint beats), so the sweep reads like RainViewer's site at
+  // half speed — motion stays continuous, the loop simply runs longer (~12.4 s without FCST,
+  // ~16 s with) and the tile prefetch stays 9-12 frames.
   const rvNC = (rvData && rvData.radar && rvData.radar.nowcast) ? rvData.radar.nowcast : [];
   const rvFrames = (rvData && rvData.radar) ? (rvData.radar.past || []).slice(-9).concat(rvNC) : [];
-  // rvXF v3 (w7ae) — full-dwell continuous blend + forward-only radar loop. Two stacked overlay
-  // layers swap roles every step: the outgoing frame fades out while the incoming fades in
-  // ('opacity .62s linear' = the whole 620 ms step), so the loop morphs continuously with no
-  // hold-snap between frames (fade-in + fade-out weights always sum to 1). Every frame's
-  // tiles are prefetched (rvPL), and the playhead (rvPP) always steps forward — through now,
-  // into the nowcast — wrapping back to the oldest after a beat on the newest.
+  // rvXF v4 (ws7ah) — full-dwell continuous blend + forward-only radar loop. Two stacked overlay
+  // layers swap roles every second 620 ms beat: the outgoing frame fades out while the incoming
+  // fades in ('opacity 1.24s linear' = the whole 2-beat crossfade), so the loop morphs
+  // continuously with no hold-snap between frames (fade-in + fade-out weights always sum to 1).
+  // Every frame's tiles are prefetched (rvPL), and the playhead (rvPP) always steps forward —
+  // through now, into the nowcast — wrapping back to the oldest after a beat on the newest.
   const rvPos = b.useRef(-1); const rvHold = b.useRef(0);
   const rvN = b.useRef(-1); const rvK = b.useRef(0); const rvPre = b.useRef([]);
+  const rvBeat = b.useRef(0); const rvPrev = b.useRef(-1);
   // start on the NOW frame (latest past frame in the trimmed timeline); rebuild when frames change
   b.useEffect(function () {
     if (!rvData || !rvData.radar) return;
     const nPast = Math.min((rvData.radar.past || []).length, 9);
     const L = rvFrames.length;
     const cur = nPast > 0 ? nPast - 1 : Math.max(0, L - 1);
-    rvPos.current = cur; rvN.current = cur; rvK.current = 0; rvHold.current = 0;
+    rvPos.current = cur; rvN.current = cur; rvK.current = 0; rvHold.current = 0; rvBeat.current = 0;
     setBuf({ n: cur, o: cur, k: 0 });
+    rvsT(0);
   }, [rvData]);
-  // rvPP — forward-only playback: 620 ms/step with the crossfade spanning the full step (w7ae
-  // continuous morph), 2-beat hold on the newest (forecast) frame, then wrap to the oldest
+  // rvPP (ws7ah) — forward-only playback with the interpolated clock: every second 620 ms beat
+  // flips the layers and starts the next 1.24 s crossfade (HUD = outgoing frame's time); the
+  // alternate mid beat only advances the HUD to the midpoint stamp between the two blending real
+  // frames (the on-screen blend genuinely IS that midpoint; skipped when the pair steps
+  // backwards on the wrap). 2-beat hold on the newest (forecast) frame, then wrap to the oldest.
   b.useEffect(function () {
     if (!rvPlay || rvFrames.length < 2) return;
+    const stampOf = function (i) { const f = rvFrames[i]; return f && f.time ? f.time : 0; };
     const t = setInterval(function () {
       const L = rvFrames.length;
-      if (rvHold.current > 0) { rvHold.current--; return; }
+      if (rvBeat.current === 1) {
+        rvBeat.current = 0;
+        const fA = rvFrames[rvPrev.current], fB = rvFrames[rvN.current];
+        const gp = (fA && fB && fA.time && fB.time) ? (fB.time - fA.time) : 0;
+        rvsT((gp > 0 && gp <= 620000) ? Math.round((fA.time + fB.time) / 2) : stampOf(rvN.current));
+        return;
+      }
+      if (rvHold.current > 0) { rvHold.current--; rvsT(stampOf(rvN.current)); return; }
       const p = (rvPos.current + 1) % L;
       if (p === rvPos.current) return;
-      const prevN = rvN.current;
+      rvPrev.current = rvN.current;
       rvPos.current = p; rvN.current = p; rvK.current = 1 - rvK.current;
+      rvBeat.current = 1;
       if (p === L - 1) rvHold.current = 2;
-      setBuf({ n: p, o: prevN, k: rvK.current });
+      rvsT(stampOf(rvPrev.current));
+      setBuf({ n: p, o: rvPrev.current, k: rvK.current });
     }, 620);
     return function () { clearInterval(t); };
   }, [rvPlay, rvData]);
@@ -139,7 +160,8 @@ function rwRV(props) {
     }
     rvPre.current = ims;
   }, [rvData, rvZoom, rvBox.w, rvBox.h]);
-  const rvTime = rvFrame ? new Date(rvFrame.time * 1000) : null;
+  const rvShowT = rvStT || (rvFrame && rvFrame.time ? rvFrame.time : 0);
+  const rvTime = rvShowT ? new Date(rvShowT * 1000) : null;
   const rvTimeStr = rvTime ? (((rvTime.getHours() % 12) === 0 ? 12 : rvTime.getHours() % 12) + ':' + (rvTime.getMinutes() < 10 ? '0' : '') + rvTime.getMinutes() + (rvTime.getHours() < 12 ? ' AM' : ' PM')) : '';
   // rvFC — forecast badge: nowcast frames sit in the future, so show an "FCST +Nm" pill by the clock
   const rvNow = Date.now() / 1000;
@@ -168,7 +190,7 @@ function rwRV(props) {
       [0, 1].map(function (K) {
         const fi = rvBuf.k === K ? rvBuf.n : rvBuf.o;
         const f = (fi >= 0 && rvFrames.length > 0) ? rvFrames[Math.min(fi, rvFrames.length - 1)] : null;
-        return n.jsxs('div', { style: { position: 'absolute', left: 0, top: 0, opacity: rvBuf.k === K ? 1 : 0, transition: 'opacity .62s linear', pointerEvents: 'none' }, children: [n.jsxs('div', { style: { position: 'absolute', left: (halfW - cpxO * OV) + 'px', top: (halfH - cpyO * OV) + 'px', transform: 'scale(' + OV + ')', transformOrigin: '0 0', width: '1px', height: '1px' }, children: [rvTiles.map(function (t) {
+        return n.jsxs('div', { style: { position: 'absolute', left: 0, top: 0, opacity: rvBuf.k === K ? 1 : 0, transition: 'opacity 1.24s linear', pointerEvents: 'none' }, children: [n.jsxs('div', { style: { position: 'absolute', left: (halfW - cpxO * OV) + 'px', top: (halfH - cpyO * OV) + 'px', transform: 'scale(' + OV + ')', transformOrigin: '0 0', width: '1px', height: '1px' }, children: [rvTiles.map(function (t) {
           return n.jsxs('div', { style: { position: 'absolute', left: t.tx * TS + 'px', top: t.y * TS + 'px', width: TS + 'px', height: TS + 'px' }, children: [
             (f && rvData && rvData.host) ? n.jsx('div', { style: { position: 'absolute', left: 0, top: 0, width: TS + 'px', height: TS + 'px', backgroundImage: 'url(' + rvData.host + f.path + '/' + TS + '/' + OZ + '/' + t.wx + '/' + t.y + '/' + COLRV + '/1_1.png)', backgroundSize: '256px 256px', pointerEvents: 'none' } }, 'fr' + fi + 'L' + K) : null
           ] }, t.key + 'L' + K);
