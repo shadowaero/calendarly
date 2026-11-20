@@ -1,6 +1,6 @@
 #!/bin/bash
 echo '== bundle parse + markers =='
-sudo node --experimental-vm-modules -e '
+node --experimental-vm-modules -e '
 const vm = require("vm");
 const fs = require("fs");
 const html = fs.readFileSync("/opt/calendarly/client/dist/index.html", "utf8");
@@ -30,6 +30,8 @@ console.log("rwInWxCard: " + (function(){var S=js.slice(js.indexOf("function wxG
 console.log("wxSrc: " + (function(){var S=js.slice(js.indexOf("function wxGUI"), js.indexOf("function wsWS({")); return S.includes("OPEN-METEO");})());
 console.log("rwXF: " + (function(){var R=js.slice(js.indexOf("function rwRV"), js.indexOf("// wxGUI")); return (R.includes("opacity .48s linear") && R.includes("rvPP") && R.includes("rvPL") && R.includes("620") && R.includes("rvHold") && !R.includes("setRvFr") && !R.match(/[^A-Za-z]rvFr[^A-Za-z]/) && !R.includes("(x + 1) % rvFrames.length")) ? 1 : 0;})());
 console.log("rwOv: " + (function(){var R=js.slice(js.indexOf("function rwRV"), js.indexOf("// wxGUI")); return (R.indexOf("halfW - cpxO * OV") >= 0 && R.indexOf("transformOrigin") >= 0 && R.indexOf("scale(") >= 0) ? 1 : 0;})());
+console.log("rvT32: " + (function(){var R=js.slice(js.indexOf("function rwRV"), js.indexOf("// wxGUI")); return (R.indexOf("const rvHR = []") >= 0 && R.indexOf("prec_radar") >= 0 && R.indexOf("rvCodBands") >= 0 && R.indexOf("weather.cod.edu/wxdata/forecast/HRRR/") >= 0 && R.indexOf("const S = 28") >= 0 && (R.match(/f\.cod/g) || []).length >= 2 && R.indexOf("concat(rvNC, rvHR)") >= 0) ? 1 : 0;})());
+console.log("rvT32badge: " + (function(){var R=js.slice(js.indexOf("function rwRV"), js.indexOf("// wxGUI")); return (R.indexOf("rvFcMin < 90 ? rvFcMin") >= 0 && R.indexOf("Math.round(rvFcMin / 30) / 2") >= 0) ? 1 : 0;})());
 console.log("rwBs: " + (function(){var R=js.slice(js.indexOf("function rwRV"), js.indexOf("// wxGUI")); return (R.indexOf("const SS = Math.min(2") >= 0 && R.indexOf("const BZ = rvZoom + SS") >= 0 && R.indexOf("+ BZ +") >= 0 && R.indexOf("+ btS +") >= 0) ? 1 : 0;})());
 console.log("rwHome: " + (function(){var R=js.slice(js.indexOf("function rwRV"), js.indexOf("// wxGUI")); return (R.indexOf("@keyframes rwPulse") >= 0 && R.indexOf("#ff2bd6") >= 0 && R.indexOf("radial-gradient") >= 0 && R.indexOf("HOME") >= 0 && R.indexOf("left: halfW") >= 0 && R.indexOf("#ef4444") < 0) ? 1 : 0;})());
 console.log("wmInWxCardOld: " + (function(){var S=js.slice(js.indexOf("function wxGUI"), js.indexOf("function wsWS({")); return S.includes("n.jsx(wm");})());
@@ -48,6 +50,9 @@ curl -s -o /dev/null -w "display17.HTTP %{http_code}\n" http://127.0.0.1:3000/di
 curl -s -o /dev/null -w "wxgui-preview.HTTP %{http_code}\n" http://127.0.0.1:3000/display/wxgui-preview
 curl -s -o /dev/null -w "radar-test.HTTP %{http_code}\n" http://127.0.0.1:3000/display/radar-test
 curl -s -o /dev/null -w "radar-api.HTTP %{http_code}\n" "http://127.0.0.1:3000/api/weather/radar?zip=32757"
+CR=$(date -u -d '75 minutes ago' +%Y%m%d%H)
+curl -s -o /dev/null -w "cod-HRRR-f002.HTTP %{http_code}\n" "https://weather.cod.edu/wxdata/forecast/HRRR/$CR/MW/HRRRMW_prec_radar_002.png"
+curl -s -o /dev/null -w "cod-HRRR-f003.HTTP %{http_code}\n" "https://weather.cod.edu/wxdata/forecast/HRRR/$CR/MW/HRRRMW_prec_radar_003.png"
 echo '== lightdm (kiosk) =='
-sudo systemctl is-active lightdm
+systemctl is-active lightdm
 
