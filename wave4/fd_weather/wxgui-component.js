@@ -1,5 +1,6 @@
 // wxGUI — full-screen "Weather GUI" block, replicating out/weathergui.jpg (v1 duplicate build)
 // ws7af — adds the 5-day hi/lo forecast strip to the hero mid-spacer (weather fetch now days=6; strip hidden when the daily feed is empty)
+// ws7an — sun-arc right column: the +12h moon label is removed; the meteo-source credit is shrunk 35% and pinned into the bottom-right corner (tighter bottom padding + tighter gap; the phase moon icon stays, now unlabeled). Sizes deliberately absent from this comment (source-count gates).
 // Injected into the client bundle right before `function wsWS` — module scope here already has:
 // n (jsx), b (react), WX_SVG, wxIco, wxIconKey, wmoBucket, fOf, inHg, fmt12, fmtHour, minsOf, DIRS,
 // rwRV (RainViewer animated radar block — injected by fdw-apply-radar-widgets.cjs before this comp)
@@ -402,10 +403,9 @@ function wxGUI(props) {
           ] })
         ] })
       ] }),
-      n.jsxs('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.4cqh', flexShrink: 0, paddingBottom: '.6cqh', whiteSpace: 'nowrap' }, children: [
-        n.jsx('div', { style: Object.assign({}, st.lblS, { fontSize: '.82cqw' }), children: 'NEXT 12H' }),
+      n.jsxs('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.3cqh', flexShrink: 0, paddingBottom: '.15cqh', whiteSpace: 'nowrap' }, children: [
         wxIco(isDay ? 'partly-cloudy-night' : 'clear-night', '2.2cqh', { height: '2.2cqh', filter: 'brightness(1.4)' }),
-        n.jsx('div', { style: { fontSize: '.75cqw', fontWeight: 700, color: '#eef3fa', whiteSpace: 'nowrap', letterSpacing: '-.02em' }, children: 'OPEN-METEO' })
+        n.jsx('div', { style: { fontSize: '.49cqw', fontWeight: 700, color: '#eef3fa', whiteSpace: 'nowrap', letterSpacing: '-.02em' }, children: 'OPEN-METEO' })
       ] })
     ] })
   ] });
