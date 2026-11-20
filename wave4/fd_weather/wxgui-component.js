@@ -1,6 +1,6 @@
 // wxGUI — full-screen "Weather GUI" block, replicating out/weathergui.jpg (v1 duplicate build)
 // ws7af — adds the 5-day hi/lo forecast strip to the hero mid-spacer (weather fetch now days=6; strip hidden when the daily feed is empty)
-// ws7an — sun-arc right column: the +12h moon label is removed; the meteo-source credit is shrunk 35% and pinned into the bottom-right corner (the phase moon icon stays, now unlabeled); ws7ao — the credit now sits half the gap from the bottom edge (corner padding halved). Sizes deliberately absent from this comment (source-count gates).
+// ws7an — sun-arc right column: the +12h moon label is removed; the meteo-source credit is shrunk 35% and pinned into the bottom-right corner (the phase moon icon stays, now unlabeled); ws7ao — the credit now sits half the gap from the bottom edge (corner padding halved); ws7ap — living-weather pass: scene clouds gain a slow bob + opacity breath on top of the drift, and the wxIco icons (condition pill, 5-day strip, meteo credit) float gently — same art, now visibly in motion (the 12-hour strip stays intentionally muted; sizes still deliberately absent).
 // Injected into the client bundle right before `function wsWS` — module scope here already has:
 // n (jsx), b (react), WX_SVG, wxIco, wxIconKey, wmoBucket, fOf, inHg, fmt12, fmtHour, minsOf, DIRS,
 // rwRV (RainViewer animated radar block — injected by fdw-apply-radar-widgets.cjs before this comp)
@@ -19,7 +19,7 @@ const WG_CSS = '@keyframes wgDrift{from{transform:translate3d(-6%,0,0)}to{transf
   '.wgMoon::after{content:"";position:absolute;left:22%;top:30%;width:16%;height:16%;border-radius:50%;background:rgba(176,188,206,.5);box-shadow:2.1cqh 1.1cqh 0 -.15ex rgba(176,188,206,.42),-.7cqh 2.4cqh 0 -.35ex rgba(176,188,206,.35)}' +
   '.wgSun{position:absolute;border-radius:50%;background:radial-gradient(circle at 40% 35%,#fff7e0 0%,#ffdf8a 55%,#f7b733 100%);box-shadow:0 0 3.4cqh 1cqh rgba(255,209,110,.55),0 0 10cqh 3.5cqh rgba(255,190,90,.18);pointer-events:none}' +
   '.wgTile{position:absolute;pointer-events:none;font-weight:700;white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.8)}' +
-  '@keyframes wgXDrift{from{transform:translate(-4%,1.5%)}to{transform:translate(4%,-1.5%)}}' +
+  '@keyframes wgXDrift{from{transform:translate(-6%,2.2%)}to{transform:translate(6%,-2.2%)}}' +
   '@keyframes wgXFall{from{transform:translateY(-20px)}to{transform:translateY(126px)}}' +
   '@keyframes wgXFallS{from{transform:translateY(-12px)}to{transform:translateY(118px)}}' +
   '@keyframes wgXSway{from{transform:translateX(-5px)}to{transform:translateX(5px)}}' +
@@ -27,7 +27,10 @@ const WG_CSS = '@keyframes wgDrift{from{transform:translate3d(-6%,0,0)}to{transf
   '@keyframes wgXBolt{0%,89%{opacity:0}90%{opacity:.9}92%{opacity:.08}94%{opacity:.75}96%{opacity:0}98%{opacity:.25}100%{opacity:0}}' +
   '@keyframes wgXFlash{0%,89%{opacity:0}90%{opacity:.38}92%{opacity:.04}94%{opacity:.3}96%{opacity:0}98%{opacity:.12}100%{opacity:0}}' +
   '@keyframes wgXFog{from{transform:translateX(-16px)}to{transform:translateX(16px)}}' +
-  '@keyframes wgXShoot{0%{opacity:0;transform:translate(0,0)}2%{opacity:1;transform:translate(10px,6px)}7%{opacity:0;transform:translate(34px,20px)}100%{opacity:0;transform:translate(34px,20px)}}';
+  '@keyframes wgXShoot{0%{opacity:0;transform:translate(0,0)}2%{opacity:1;transform:translate(10px,6px)}7%{opacity:0;transform:translate(34px,20px)}100%{opacity:0;transform:translate(34px,20px)}}' +
+  '@keyframes wgXBob{from{transform:translateY(0)}to{transform:translateY(-2.4px)}}' +
+  '@keyframes wgXBreath{from{opacity:.86}to{opacity:1}}' +
+  '@keyframes wgIcoBob{from{transform:translateY(.16cqh)}to{transform:translateY(-.2cqh)}}';
 function wxGUI(props) {
   const c = (props && props.config) || {};
   const ff = (props && props.fontFamilyClass) || '';
@@ -165,12 +168,12 @@ function wxGUI(props) {
       ] }, key);
     };
     const cloud = function (cx, cy, s, dur, delay, op, key) {
-      return n.jsx('g', { style: { animation: 'wgXDrift ' + dur + 's ease-in-out infinite alternate', animationDelay: delay + 's' }, children: n.jsxs('g', { transform: 'translate(' + cx + ' ' + cy + ') scale(' + s + ')', opacity: op, filter: 'url(#wgXB2)', children: [
+      return n.jsx('g', { style: { animation: 'wgXBob ' + (dur * .52).toFixed(1) + 's ease-in-out infinite alternate, wgXBreath ' + (dur * .8).toFixed(1) + 's ease-in-out infinite alternate', animationDelay: (-cx * .13) + 's' }, children: n.jsx('g', { style: { animation: 'wgXDrift ' + dur + 's ease-in-out infinite alternate', animationDelay: delay + 's' }, children: n.jsxs('g', { transform: 'translate(' + cx + ' ' + cy + ') scale(' + s + ')', opacity: op, filter: 'url(#wgXB2)', children: [
         n.jsx('ellipse', { cx: -17, cy: 4, rx: 14, ry: 9.5, fill: clFill }),
         n.jsx('ellipse', { cx: 1, cy: -5, rx: 17, ry: 11.5, fill: clFill }),
         n.jsx('ellipse', { cx: 17, cy: 2, rx: 15, ry: 10, fill: clFill }),
         n.jsx('ellipse', { cx: 1, cy: 6, rx: 22, ry: 9.5, fill: clFill })
-      ] }) }, key);
+      ] }) }) }, key);
     };
     if (isD) {
       if (!night) {
@@ -326,7 +329,7 @@ function wxGUI(props) {
     n.jsxs('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '1.4cqh' }, children: [
       n.jsx('div', { style: st.big, children: outT != null ? outT + '\u00B0' : '\u2014' }),
       n.jsxs('div', { style: st.pill, children: [
-        wxIco(heroKey, '2.5cqh', { height: '2.5cqh', filter: 'brightness(1.2) saturate(1.1)' }),
+        wxIco(heroKey, '2.5cqh', { height: '2.5cqh', filter: 'brightness(1.2) saturate(1.1)', animation: 'wgIcoBob 4.2s ease-in-out infinite alternate' }),
         n.jsx('span', { children: cond || (isDay ? 'Partly cloudy' : 'Clear') })
       ] })
     ] }),
@@ -404,7 +407,7 @@ function wxGUI(props) {
         ] })
       ] }),
       n.jsxs('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.3cqh', flexShrink: 0, paddingBottom: '.075cqh', whiteSpace: 'nowrap' }, children: [
-        wxIco(isDay ? 'partly-cloudy-night' : 'clear-night', '2.2cqh', { height: '2.2cqh', filter: 'brightness(1.4)' }),
+        wxIco(isDay ? 'partly-cloudy-night' : 'clear-night', '2.2cqh', { height: '2.2cqh', filter: 'brightness(1.4)', animation: 'wgIcoBob 6.4s ease-in-out infinite alternate' }),
         n.jsx('div', { style: { fontSize: '.49cqw', fontWeight: 700, color: '#eef3fa', whiteSpace: 'nowrap', letterSpacing: '-.02em' }, children: 'OPEN-METEO' })
       ] })
     ] })
@@ -432,7 +435,7 @@ function wxGUI(props) {
       const ic = wxIconKey(d.code != null ? d.code : 2, 1);
       cells.push(n.jsxs('div', { key: 'fx' + i, style: { flex: '1 1 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.45cqh', minWidth: 0 }, children: [
         n.jsx('div', { style: { fontSize: '.78cqw', fontWeight: 700, letterSpacing: '.1em', color: i === 0 ? '#c9d6e6' : '#7288a2' }, children: dn }),
-        wxIco(ic, '2.6cqh', { height: '2.6cqh', filter: 'brightness(1.15) saturate(1.05)' }),
+        wxIco(ic, '2.6cqh', { height: '2.6cqh', filter: 'brightness(1.15) saturate(1.05)', animation: 'wgIcoBob ' + (4.4 + (i % 3) * .7) + 's ease-in-out infinite alternate', animationDelay: (-i * .75) + 's' }),
         n.jsx('div', { style: { fontSize: '2.2cqh', fontWeight: 800, color: '#f5b969', lineHeight: 1 }, children: d.max != null ? d.max + '\u00B0' : '\u2014' }),
         n.jsx('div', { style: { fontSize: '1.72cqh', fontWeight: 600, color: '#93a7c0', lineHeight: 1 }, children: d.min != null ? d.min + '\u00B0' : '\u2014' })
       ] }));
