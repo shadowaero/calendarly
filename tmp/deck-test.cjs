@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// deck-test.cjs — ws7aj (Rainbow primary: wall-clock snapshot floor(Date.now()/600s)*600, deck =
-// 7 past frames + the guaranteed FCST +30m frame, tiles through /radar/api with the key on the
-// server; the RainViewer path is kept as automatic fallback so the slice(-7) timeline + the
-// ws7ah beat engine stay). Asserts the rbk deck builder + fallback timeline + beat engine +
-// 1.24s full-dwell crossfade + tokens across all kits.
+// deck-test.cjs — ws7am (Rainbow primary: the edge snapshot comes from /radar/api/snapshot; deck
+// = 7 past frames + ONE nowcast frame at +2 h (offset 7200 — frame count is the quota lever and
+// offset reach is free, so one further-out frame keeps the ws7aj burn), tiles through /radar/api
+// with the key on the server; the RainViewer path is kept as automatic fallback so the slice(-7)
+// timeline + the ws7ah beat engine stay). Asserts the rbk deck builder + fallback timeline +
+// ws7ah beat engine + 1.24s full-dwell crossfade + tokens across all kits.
 const fs = require('fs');
 const R = 'c:/Users/xxtoo/Documents/IDX6011/';
 const comp = fs.readFileSync(R + 'wave4/fd_weather/rw-rainview-comp.js', 'utf8');
@@ -17,13 +18,17 @@ const xp = fs.readFileSync(R + 'tmp/future/fdw-apply-wx5.cjs', 'utf8');
 const cnt = function (s, needle) { return s.split(needle).length - 1; };
 const results = [];
 const want = function (name, got, exp) { results.push([name, got, exp]); };
-want('comp.token', cnt(comp, 'ws7al') >= 1, true);
+want('comp.token', cnt(comp, 'ws7am') >= 1, true);
+want('comp.fcst7200', cnt(comp, 'o: 7200'), 1);
+want('comp.fcstSweepGone', cnt(comp, 'F2 <= 6'), 0);
+want('comp.fcst1800Gone', cnt(comp, 'o: 1800'), 0);
 want('comp.rvT30Gone', cnt(comp, 'rvT30'), 0);
 want('comp.rbkFloorGone', cnt(comp, 'Math.floor(Date.now() / 600000)'), 0);
 want('comp.rbkSnapFetch', cnt(comp, '/radar/api/snapshot') >= 1, true);
 want('comp.rbkHealth', cnt(comp, '/radar/api/health'), 1);
 want('comp.rbkProxyUrl', cnt(comp, 'precip-global'), 2);
-want('comp.rbkFcst', cnt(comp, 'o: 1800'), 1);
+want('comp.rbkFcst', cnt(comp, 'o: 7200'), 1);
+want('comp.rbkFcstPath', cnt(comp, "path: 'rbkF'"), 1);
 want('comp.timeline.slice7', cnt(comp, '.slice(-7).concat(rvNC)'), 1);
 want('comp.timeline.slice9Gone', cnt(comp, '.slice(-9).concat'), 0);
 want('comp.timeline.slice6Gone', cnt(comp, '.slice(-6).concat'), 0);
@@ -39,7 +44,8 @@ want('comp.midGapCap', cnt(comp, '620000'), 1);
 want('comp.clockFallback', cnt(comp, 'rvStT ||'), 1);
 want('comp.xfade', cnt(comp, 'opacity 1.24s linear') >= 2, true);
 want('comp.xfade62Gone', cnt(comp, '.62s linear'), 0);
-want('comp.fcstBadge', cnt(comp, "'FCST +' + rvFcMin") >= 1, true);
+want('comp.fcstBadge', cnt(comp, "'FCST +' + (rvFcMin < 90") >= 1, true);
+want('comp.fcstBadgeHour', cnt(comp, "rvFcMin / 30) / 2") >= 1, true);
 want('comp.fcstWindow', cnt(comp, 'rvFrame.time > rvNow + 60'), 1);
 want('comp.startAnchor', cnt(comp, 'rvFrames.np || 7'), 1);
 want('comp.rbkNP', cnt(comp, 'rvFrames.np = (rvRBK && rbkSnap) ? 7 :'), 1);
@@ -52,9 +58,9 @@ want('comp.zoom13Load', cnt(comp, 'lz >= 3 && lz <= 13'), 1);
 want('comp.zoom12Gone', cnt(comp, '3), 12)') + cnt(comp, 'lz <= 12'), 0);
 want('comp.ozRbk', cnt(comp, 'const OZ = Math.min(rvZoom, rvRBK ? 10 : 7)'), 1);
 want('comp.oz7Gone', cnt(comp, 'const OZ = Math.min(rvZoom, 7)'), 0);
-want('widgets.ver', cnt(wp, "const jsVer = 'ws7al';"), 1);
+want('widgets.ver', cnt(wp, "const jsVer = 'ws7am';"), 1);
 want('widgets.staleTokens', cnt(wp, 'ws7aa') + cnt(wp, 'ws7ab') + cnt(wp, 'ws7ac') + cnt(wp, 'ws7ad') + cnt(wp, 'ws7ae') + cnt(wp, 'ws7af') + cnt(wp, 'ws7ag') + cnt(wp, 'ws7ah') + cnt(wp, 'ws7ai') + cnt(wp, 'ws7aj') + cnt(wp, 'ws7ak'), 0);
-want('nas.ver', cnt(np, "const jsVer = 'ws7al';"), 1);
+want('nas.ver', cnt(np, "const jsVer = 'ws7am';"), 1);
 want('nas.staleTokens', cnt(np, 'ws7aa') + cnt(np, 'ws7ab') + cnt(np, 'ws7ac') + cnt(np, 'ws7ad') + cnt(np, 'ws7ae') + cnt(np, 'ws7af') + cnt(np, 'ws7ag') + cnt(np, 'ws7ah') + cnt(np, 'ws7ai') + cnt(np, 'ws7aj') + cnt(np, 'ws7ak'), 0);
 want('wxgui6.rvT32ChecksGone', cnt(wsh, 'rvT32') + cnt(wsh, 'cod-HRRR'), 0);
 want('wxgui6.rwXFKept', cnt(wsh, 'opacity 1.24s linear'), 1);
@@ -66,7 +72,8 @@ want('wxgui6.rbkDeckGate', cnt(wsh, 'rbkDeck'), 1);
 want('wxgui6.rbkNoUpstreamGate', cnt(wsh, 'rbkNoUpstream'), 1);
 want('wxgui6.formRainbowGate', cnt(wsh, 'Rainbow Radar Config'), 1);
 want('wxgui6.rwOzGate', cnt(wsh, 'rwOz:'), 1);
-want('eventedit.curToken', cnt(ev, '?v=ws7al'), 2);
+want('eventedit.curToken', cnt(ev, '?v=ws7am'), 2);
+want('eventedit.staleHas7al', cnt(ev, "grep -c '?v=ws7al'"), 1);
 want('eventedit.cur7aiGone', cnt(ev, "'?v=ws7ai'"), 1);
 want('eventedit.staleHas7aj', cnt(ev, "grep -c '?v=ws7aj'"), 1);
 want('eventedit.staleHas7ak', cnt(ev, "grep -c '?v=ws7ak'"), 1);
@@ -87,8 +94,9 @@ want('wxc.fx5nullguard', cnt(wxc, "cols[0].max == null"), 1);
 want('wx5.ver', cnt(xp, "const jsVer = 'ws7af';"), 1);
 want('wx5.orig8', cnt(xp, 'orig8.'), 4);
 want('wx5.guardFx5', cnt(xp, 'fx5='), 1);
-want('shipnas.token', cnt(sn, 'const TOKEN = "ws7al";'), 1);
-want('shipnas.staleToken', cnt(sn, 'ws7ah') + cnt(sn, 'ws7ai') + cnt(sn, 'ws7aj') + cnt(sn, 'ws7ak'), 0);
+want('shipnas.token', cnt(sn, 'const TOKEN = "ws7am";'), 1);
+want('shipnas.staleToken', cnt(sn, 'ws7ah') + cnt(sn, 'ws7ai') + cnt(sn, 'ws7aj') + cnt(sn, 'ws7ak') + cnt(sn, 'ws7al'), 0);
+want('shipnas.fcstGate', cnt(sn, "js.includes('o: 7200')"), 1);
 want('shipnas.absenceChecks', cnt(sn, "js.includes('prec_radar')?0:1") + cnt(sn, "js.includes('sint/')?0:1") + cnt(sn, "js.includes('rvHR')?0:1"), 3);
 want('shipnas.slice7', cnt(sn, ".slice(-7).concat(rvNC"), 1);
 want('shipnas.slice9Gone', cnt(sn, "js.includes('.slice(-9).concat')?0:1"), 1);
@@ -131,21 +139,25 @@ for (let i = 0; i < 6; i++) {
   stamps.push(framesNoNC[sPrev].time);
 }
 want('clock.stampSeq', stamps.join(','), (now - 600) + ',' + (now - 4200) + ',' + (now - 4200) + ',' + (now - 3900) + ',' + (now - 3600) + ',' + (now - 3300));
-// micro (ws7aj): wall-clock snapshot builder — snap floored to 10-min; deck = 7 past frames +
-// FCST +30m; past frames target offset 0 of their own snapshot; the FCST frame hits offset 1800.
+// micro (ws7am): wall-clock snapshot builder — snap floored to 10-min; deck = 7 past frames +
+// ONE +2h nowcast frame; past frames target offset 0 of their own snapshot; the FCST frame hits
+// offset 7200 of the ONE edge snapshot (one (snap, offset) family per publish roll — the same
+// mint cost as the old ws7aj +30m family, at 4x the reach).
 const rbkNow = Math.floor(Date.now() / 1000);
 const rbkSnap = Math.floor(rbkNow / 600) * 600;
-const frR = []; for (let K = 6; K >= 1; K--) frR.push({ time: rbkSnap - K * 600, s: rbkSnap - K * 600, o: 0, rbk: 1, path: 'rbk' + K }); frR.push({ time: rbkSnap, s: rbkSnap, o: 0, rbk: 1, path: 'rbk0' }); frR.push({ time: rbkSnap + 1800, s: rbkSnap, o: 1800, rbk: 1, path: 'rbkF' });
+const frR = []; for (let K = 6; K >= 1; K--) frR.push({ time: rbkSnap - K * 600, s: rbkSnap - K * 600, o: 0, rbk: 1, path: 'rbk' + K }); frR.push({ time: rbkSnap, s: rbkSnap, o: 0, rbk: 1, path: 'rbk0' }); frR.push({ time: rbkSnap + 7200, s: rbkSnap, o: 7200, rbk: 1, path: 'rbkF' });
 frR.np = 7;
 want('rbkDeck.len', frR.length, 8);
 want('rbkDeck.np', frR.np, 7);
 want('rbkDeck.firstTime', frR[0].time, rbkSnap - 3600);
 want('rbkDeck.pastOwnSnap', frR[2].s, rbkSnap - 4 * 600);
 want('rbkDeck.nowIsSelf', frR[6].s, rbkSnap);
-want('rbkDeck.tailIsFcst', frR[7].time - rbkSnap, 1800);
-want('rbkDeck.fcstOffset', frR[7].o, 1800);
-want('rbkDeck.spanMin', Math.round((frR[7].time - frR[0].time) / 60), 90);
-want('rbkDeck.proxyUrl', ('/radar/api/tiles/v1/precip-global/' + frR[3].s + '/' + frR[3].o + '/7/17/26?color=8').indexOf('/radar/api/tiles/v1/precip-global/' + (rbkSnap - 3 * 600) + '/0/7/17/26?color=8'), 0);
+want('rbkDeck.tailIsFcst', frR[7].time - rbkSnap, 7200);
+want('rbkDeck.fcstOffset', frR[7].o, 7200);
+want('rbkDeck.fcstEdgeSnap', frR[7].s, rbkSnap);
+want('rbkDeck.spanMin', Math.round((frR[7].time - frR[0].time) / 60), 180);
+want('rbkDeck.proxyUrlPast', ('/radar/api/tiles/v1/precip-global/' + frR[3].s + '/' + frR[3].o + '/7/17/26?color=8').indexOf('/radar/api/tiles/v1/precip-global/' + (rbkSnap - 3 * 600) + '/0/7/17/26?color=8'), 0);
+want('rbkDeck.proxyUrlFcst', ('/radar/api/tiles/v1/precip-global/' + frR[7].s + '/' + frR[7].o + '/7/17/26?color=8').indexOf('/radar/api/tiles/v1/precip-global/' + rbkSnap + '/7200/7/17/26?color=8'), 0);
 // micro (ws7ak): per-source overlay zoom — Rainbow frames render native to z10 (real data
 // probed at z8-10; z11/12 blank upstream), RainViewer frames stay at its z7 tilecache cap; the
 // scale(OV) wrapper upscales rvZoom beyond the cap (never blank, never raw z7 mush).

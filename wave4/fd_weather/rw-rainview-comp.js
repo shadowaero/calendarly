@@ -6,9 +6,11 @@
 // snapshot id IS NOT wall-clock (their published edge lags real time), so the deck takes the
 // snapshot from the proxy (/radar/api/snapshot — 1 upstream call, 2-min proxy cache, last-good
 // kept). Frame math at that snap is fully deterministic. Deck = the 7 past
-// frames at that cadence (the last hour) + ONE guaranteed Rainbow nowcast frame at +30 min
-// ("FCST +30m" badge; Rainbow guarantees nowcasts out to +4 h in 10-min steps — offsets
-// 600..14400 — if a longer tail is ever wanted, it is a one-line change). Playback (ws7ah)
+// frames at that cadence (the last hour) + ONE Rainbow nowcast frame at +2 h (ws7am: offset 7200
+// — the old tail was +30 m; Rainbow guarantees nowcasts to +4 h in 10-min steps, offsets
+// 600..14400, so any offset is available — and the free-tier proxy quota charges per (snap,
+// offset) family minted on every publish roll (~12 tiles), so ONE further-out frame costs the
+// same as the old +30 m while reaching four times further). Playback (ws7ah)
 // engine kept: 620 ms beats, 1.24 s full-dwell crossfades, HUD clock in interpolated 5-min
 // stamps, 2-beat hold on the newest frame, forward-only loop (oldest -> now -> forecast, wraps).
 // Fallback (health = 0): RainViewer's last 7 past frames (1 h sweep at its 10-min publish
@@ -50,7 +52,8 @@ function rwRV(props) {
   // ws7aj state: rbkOK = proxy health (null unknown / 1 ok / 0 down), rbkSnap = { s, f } with the
   // AUTHORED edge snapshot (proxy-served from Rainbow's snapshot endpoint; the published edge is
   // NOT wall-clock — it lags real time — so the deck never derives it locally; the proxy caches
-  // it for 2 min and keeps the last good) and its 8-frame deck; refreshed every 2 min.
+  // it for 2 min and keeps the last good) and its 8-frame deck (7 past + the +2 h FCST frame);
+  // refreshed every 2 min.
   const rbkH = b.useState(null); const rbkOK = rbkH[0]; const setRbkOK = rbkH[1];
   const rbkM = b.useState(null); const rbkSnap = rbkM[0]; const setRbkSnap = rbkM[1];
   b.useEffect(function () {
@@ -64,7 +67,11 @@ function rwRV(props) {
       const fr = [];
       for (let K2 = 6; K2 >= 1; K2--) fr.push({ time: s - K2 * 600, s: s - K2 * 600, o: 0, rbk: 1, path: 'rbk' + K2 });
       fr.push({ time: s, s: s, o: 0, rbk: 1, path: 'rbk0' });
-      fr.push({ time: s + 1800, s: s, o: 1800, rbk: 1, path: 'rbkF' });
+      // ws7am: tail = ONE nowcast frame at +2 h (offset 7200 — guaranteed like every Rainbow step
+      // <= 14400). The proxy quota charges per (snap, offset) family minted on each publish roll,
+      // so frame COUNT is what scales cost while offset magnitude is free — a single +2 h frame
+      // burns the same ~12 tiles/roll as the old +30 m frame (ws7aj) at 4x the reach.
+      fr.push({ time: s + 7200, s: s, o: 7200, rbk: 1, path: 'rbkF' });
       return { s: s, f: fr };
     };
     const tk = function () {
@@ -90,18 +97,21 @@ function rwRV(props) {
     const pull = function () { fetch('https://api.rainviewer.com/public/weather-maps.json').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setRvData(j); }).catch(function () { if (!dead) setRvData(null); }); };
     pull(); const iv = setInterval(pull, 300000); return function () { dead = true; clearInterval(iv); };
   }, []);
-  // ws7aj timeline: Rainbow mode (proxy healthy) = the derived 8-frame deck — 7 past frames at
-  // the fixed 10-min cadence + the guaranteed nowcast frame at +30 min; Rainbow guarantees
-  // nowcasts to +4 h in 10-min steps (offset 600..14400) if a longer FCST tail is ever wanted.
+  // ws7am timeline: Rainbow mode (proxy healthy) = the derived 8-frame deck — 7 past frames at
+  // the fixed 10-min cadence + ONE nowcast frame at +2 h (offset 7200; measured on the live
+  // proxy 2026-11-20: every publish roll mints its (snap, offset) family at ~12 tiles, so
+  // frame count is the quota lever and offset reach is free — a 6-frame +1 h sweep measured at
+  // ~900+ upstream calls/day vs the 9300/month brake, the single +2 h frame keeps today's burn).
   // Fallback mode (rbkOK 0/ null, or no data yet): the original RainViewer deck — the last 7
   // past frames (1 h sweep at RainViewer's 10-min publish cadence; the timeline refetch below
   // runs every 5 min so new frames land within ≤5 min) + the free +30 min nowcast tail when
   // upstream serves it (probed 2026-11-20 weather-maps.json even served "nowcast":[] — the tail
   // appears by itself when frames return). Wall: 1 h + FCST in both modes.
   // Playback (ws7ah) halves the perceived step: each crossfade spans TWO 620 ms beats and the
-  // HUD clock ticks in interpolated 5-min stamps (midpoint beats), so the sweep reads like
-  // RainViewer's site — motion stays continuous; the loop runs ~9.9 s without FCST, ~13.6 s
-  // with, and the tile prefetch stays 7-10 frames.
+  // HUD clock ticks in interpolated 5-min stamps (midpoint beats — the NOW->+2 h jump shows the
+  // interpolated ~+1 h stamp while the two frames blend), so the sweep reads like RainViewer's
+  // site — motion stays continuous; the loop runs ~9.9 s without FCST, ~11.2 s with, and the
+  // tile prefetch stays 8 frames.
   const rvNC = (rvData && rvData.radar && rvData.radar.nowcast) ? rvData.radar.nowcast : [];
   const rvRBK = (rbkOK === 1 && rbkSnap);
   const rvFrames = (rvRBK && rbkSnap) ? rbkSnap.f : (rvData && rvData.radar) ? (rvData.radar.past || []).slice(-7).concat(rvNC) : [];
@@ -235,7 +245,8 @@ function rwRV(props) {
   const rvShowT = rvStT || (rvFrame && rvFrame.time ? rvFrame.time : 0);
   const rvTime = rvShowT ? new Date(rvShowT * 1000) : null;
   const rvTimeStr = rvTime ? (((rvTime.getHours() % 12) === 0 ? 12 : rvTime.getHours() % 12) + ':' + (rvTime.getMinutes() < 10 ? '0' : '') + rvTime.getMinutes() + (rvTime.getHours() < 12 ? ' AM' : ' PM')) : '';
-  // rvFC — forecast badge: nowcast frames sit in the future, so show an "FCST +Nm" pill by the clock
+  // rvFC — forecast badge: nowcast frames sit in the future, so show an "FCST +Nm" pill by the
+  // clock (past 90 min the badge reads "+Nh" so the +2 h tail frame stays compact)
   const rvNow = Date.now() / 1000;
   const rvFcst = rvFrame && rvFrame.time && rvFrame.time > rvNow + 60;
   const rvFcMin = rvFcst ? Math.round((rvFrame.time - rvNow) / 60) : 0;
@@ -247,7 +258,7 @@ function rwRV(props) {
         CTL ? n.jsx('button', { type: 'button', onClick: function () { rvSet(rvZoom + 1); }, style: { width: 24, height: 24, borderRadius: '999px', border: '1px solid rgba(255,255,255,.25)', background: 'rgba(255,255,255,.08)', color: '#e2e9f2', fontSize: 12, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, opacity: rvZoom >= 10 ? 0.35 : 1 }, children: '+' }) : null,
         n.jsx('button', { type: 'button', onClick: function () { setRvPlay(!rvPlay); }, style: { width: 22, height: 22, borderRadius: '999px', border: '1px solid rgba(255,255,255,.25)', background: 'rgba(255,255,255,.08)', color: '#e2e9f2', fontSize: 10, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }, children: rvPlay ? '\u23F8' : '\u25B6' }),
         n.jsx('span', { style: { fontSize: '9pt', color: '#93a7c0', fontWeight: 600 }, children: rvTimeStr || 'Loading\u2026' }),
-        rvFcst ? n.jsx('span', { style: { fontSize: '8pt', fontWeight: 800, letterSpacing: '.08em', color: '#7ff3ff', background: 'rgba(0,140,160,.28)', border: '1px solid rgba(127,243,255,.55)', borderRadius: 6, padding: '1px 6px', whiteSpace: 'nowrap' }, children: 'FCST +' + rvFcMin + 'm' }) : null
+        rvFcst ? n.jsx('span', { style: { fontSize: '8pt', fontWeight: 800, letterSpacing: '.08em', color: '#7ff3ff', background: 'rgba(0,140,160,.28)', border: '1px solid rgba(127,243,255,.55)', borderRadius: 6, padding: '1px 6px', whiteSpace: 'nowrap' }, children: 'FCST +' + (rvFcMin < 90 ? rvFcMin + 'm' : (Math.round(rvFcMin / 30) / 2) + 'h') }) : null
       ] })
     ] }),
     n.jsx('div', { ref: rvRef, onTouchStart: pvStart, onTouchMove: pvMove, onTouchEnd: pvEnd, onTouchCancel: pvEnd, style: { position: 'relative', flex: '1 1 auto', minHeight: 0, overflow: 'hidden', touchAction: CTL ? 'none' : undefined }, children: rvBox.w ? n.jsxs('div', { style: { position: 'absolute', left: 0, top: 0 }, children: [
