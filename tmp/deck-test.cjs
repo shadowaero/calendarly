@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// deck-test.cjs — ws7am radar deck + ws7an wx corner (Rainbow primary: the edge snapshot comes from /radar/api/snapshot; deck
+// deck-test.cjs — ws7am radar deck + ws7ao wx credit micro-wave (Rainbow primary: the edge snapshot comes from /radar/api/snapshot; deck
 // = 7 past frames + ONE nowcast frame at +2 h (offset 7200 — frame count is the quota lever and
 // offset reach is free, so one further-out frame keeps the ws7aj burn), tiles through /radar/api
 // with the key on the server; the RainViewer path is kept as automatic fallback so the slice(-7)
@@ -74,9 +74,11 @@ want('wxgui6.formRainbowGate', cnt(wsh, 'Rainbow Radar Config'), 1);
 want('wxgui6.rwOzGate', cnt(wsh, 'rwOz:'), 1);
 want('wxgui6.omSmGate', cnt(wsh, 'omSm:'), 1);
 want('wxgui6.n12Gate', cnt(wsh, 'n12Gone:'), 1);
-want('eventedit.curToken', cnt(ev, '?v=ws7an'), 2);
+want('wxgui6.omHalfGate', cnt(wsh, 'omHalf:'), 1);
+want('eventedit.curToken', cnt(ev, '?v=ws7ao'), 2);
 want('eventedit.staleHas7al', cnt(ev, "grep -c '?v=ws7al'"), 1);
 want('eventedit.staleHas7am', cnt(ev, "grep -c '?v=ws7am'"), 1);
+want('eventedit.staleHas7an', cnt(ev, "grep -c '?v=ws7an'"), 1);
 want('eventedit.cur7aiGone', cnt(ev, "'?v=ws7ai'"), 1);
 want('eventedit.staleHas7aj', cnt(ev, "grep -c '?v=ws7aj'"), 1);
 want('eventedit.staleHas7ak', cnt(ev, "grep -c '?v=ws7ak'"), 1);
@@ -96,9 +98,9 @@ want('wxc.fx5spacer', cnt(wxc, 'children: fx5 || undefined'), 1);
 want('wxc.fx5nullguard', cnt(wxc, "cols[0].max == null"), 1);
 want('wxc.omLabel', cnt(wxc, 'OPEN-METEO'), 1);
 want('wxc.omSm', cnt(wxc, '.49cqw'), 1);
-want('wxc.omLow', cnt(wxc, "paddingBottom: '.15cqh'"), 1);
+want('wxc.omLow', cnt(wxc, "paddingBottom: '.075cqh'"), 1);
 want('wxc.n12Gone', cnt(wxc, 'NEXT 12H'), 0);
-want('wx5.ver', cnt(xp, "const jsVer = 'ws7an';"), 1);
+want('wx5.ver', cnt(xp, "const jsVer = 'ws7ao';"), 1);
 want('wx5.orig8', cnt(xp, 'orig8.'), 4);
 want('wx5.guardFx5', cnt(xp, 'fx5='), 1);
 want('shipnas.token', cnt(sn, 'const TOKEN = "ws7am";'), 1);
