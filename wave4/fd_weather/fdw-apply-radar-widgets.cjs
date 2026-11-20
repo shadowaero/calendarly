@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// FD radar-widgets patcher rvT32c (?v=ws7aa). Runs on the Pi: sudo node /tmp/fdw-apply-radar-widgets.cjs
+// FD radar-widgets patcher rvT30 (?v=ws7ac). Runs on the Pi: sudo node /tmp/fdw-apply-radar-widgets.cjs
 // Adds two resizable radar block types for screens studio: "radar_windy" (Windy iframe embed)
 // and "radar_rainviewer" (RainViewer public API over dark OSM base). Injects components right
 // BEFORE the `// wxGUI` marker (so the wxgui patcher's upgrade slice never deletes them), plus
@@ -8,7 +8,7 @@
 // Rollback: cp orig7.<name> <name> + restart lightdm.
 const fs = require('fs');
 const path = require('path');
-const jsVer = 'ws7aa';
+const jsVer = 'ws7ac';
 const report = { steps: [], ok: true };
 const step = (name, status, extra) => { report.steps.push({ name, status, extra }); console.log('[' + status + '] ' + name + (extra ? ' :: ' + extra : '')); if (status === 'FAIL') report.ok = false; };
 const dist = process.env.FDW_DIST || '/opt/calendarly/client/dist';
