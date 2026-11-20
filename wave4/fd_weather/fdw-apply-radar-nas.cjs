@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// FD radar-widgets patcher NAS variant rvT30 (?v=ws7ad). Runs inside the family-dashboard container:
+// FD radar-widgets patcher NAS variant rvT30 (?v=ws7ae). Runs inside the family-dashboard container:
 //   docker exec family-dashboard node /tmp/fdw-apply-radar-nas.cjs
 // Same injections as fdw-apply-radar-widgets.cjs but WITHOUT the wxGUI-marker dependency (the NAS
 // bundle has no wxgui/ws kit): the two radar comps inject right before \nfunction wsWS behind the
@@ -7,7 +7,7 @@
 // Backups: orig7.* (bundle + index.html, taken before any change). Rollback: cp orig7.<name> <name>.
 const fs = require('fs');
 const path = require('path');
-const jsVer = 'ws7ad';
+const jsVer = 'ws7ae';
 const report = { steps: [], ok: true };
 const step = (name, status, extra) => { report.steps.push({ name, status, extra }); console.log('[' + status + '] ' + name + (extra ? ' :: ' + extra : '')); if (status === 'FAIL') report.ok = false; };
 const dist = process.env.FDW_DIST || '/app/client/dist';

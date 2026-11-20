@@ -38,10 +38,12 @@ function rwRV(props) {
   // both branches land at ~13 frames (~9 s/loop) so the sweep stays long + smooth either way.
   const rvNC = (rvData && rvData.radar && rvData.radar.nowcast) ? rvData.radar.nowcast : [];
   const rvFrames = (rvData && rvData.radar) ? (rvData.radar.past || []).slice(rvNC.length ? -10 : -13).concat(rvNC) : [];
-  // rvXF v2 — crossfade + forward-only radar loop. Two stacked overlay layers: the outgoing frame
-  // stays painted while the incoming one fades in over it ('opacity .48s linear'), every frame's
-  // tiles are prefetched (rvPL), and the playhead (rvPP) always steps forward — ~80-120 min of radar
-  // trend, through now, into the nowcast — wrapping back to the oldest after a beat on the newest.
+  // rvXF v3 (w7ae) — full-dwell continuous blend + forward-only radar loop. Two stacked overlay
+  // layers swap roles every step: the outgoing frame fades out while the incoming fades in
+  // ('opacity .62s linear' = the whole 620 ms step), so the loop morphs continuously with no
+  // hold-snap between frames (fade-in + fade-out weights always sum to 1). Every frame's
+  // tiles are prefetched (rvPL), and the playhead (rvPP) always steps forward — through now,
+  // into the nowcast — wrapping back to the oldest after a beat on the newest.
   const rvPos = b.useRef(-1); const rvHold = b.useRef(0);
   const rvN = b.useRef(-1); const rvK = b.useRef(0); const rvPre = b.useRef([]);
   // start on the NOW frame (latest past frame in the trimmed timeline); rebuild when frames change
@@ -53,8 +55,8 @@ function rwRV(props) {
     rvPos.current = cur; rvN.current = cur; rvK.current = 0; rvHold.current = 0;
     setBuf({ n: cur, o: cur, k: 0 });
   }, [rvData]);
-  // rvPP — forward-only playback: 620 ms/step, 480 ms crossfade, 2-beat hold on the newest
-  // (forecast) frame, then wrap back to the oldest so every loop replays trend -> forecast
+  // rvPP — forward-only playback: 620 ms/step with the crossfade spanning the full step (w7ae
+  // continuous morph), 2-beat hold on the newest (forecast) frame, then wrap to the oldest
   b.useEffect(function () {
     if (!rvPlay || rvFrames.length < 2) return;
     const t = setInterval(function () {
@@ -162,7 +164,7 @@ function rwRV(props) {
       [0, 1].map(function (K) {
         const fi = rvBuf.k === K ? rvBuf.n : rvBuf.o;
         const f = (fi >= 0 && rvFrames.length > 0) ? rvFrames[Math.min(fi, rvFrames.length - 1)] : null;
-        return n.jsxs('div', { style: { position: 'absolute', left: 0, top: 0, opacity: rvBuf.k === K ? 1 : 0, transition: 'opacity .48s linear', pointerEvents: 'none' }, children: [n.jsxs('div', { style: { position: 'absolute', left: (halfW - cpxO * OV) + 'px', top: (halfH - cpyO * OV) + 'px', transform: 'scale(' + OV + ')', transformOrigin: '0 0', width: '1px', height: '1px' }, children: [rvTiles.map(function (t) {
+        return n.jsxs('div', { style: { position: 'absolute', left: 0, top: 0, opacity: rvBuf.k === K ? 1 : 0, transition: 'opacity .62s linear', pointerEvents: 'none' }, children: [n.jsxs('div', { style: { position: 'absolute', left: (halfW - cpxO * OV) + 'px', top: (halfH - cpyO * OV) + 'px', transform: 'scale(' + OV + ')', transformOrigin: '0 0', width: '1px', height: '1px' }, children: [rvTiles.map(function (t) {
           return n.jsxs('div', { style: { position: 'absolute', left: t.tx * TS + 'px', top: t.y * TS + 'px', width: TS + 'px', height: TS + 'px' }, children: [
             (f && rvData && rvData.host) ? n.jsx('div', { style: { position: 'absolute', left: 0, top: 0, width: TS + 'px', height: TS + 'px', backgroundImage: 'url(' + rvData.host + f.path + '/' + TS + '/' + OZ + '/' + t.wx + '/' + t.y + '/' + COLRV + '/1_1.png)', backgroundSize: '256px 256px', pointerEvents: 'none' } }, 'fr' + fi + 'L' + K) : null
           ] }, t.key + 'L' + K);
