@@ -1,4 +1,5 @@
 // wxGUI — full-screen "Weather GUI" block, replicating out/weathergui.jpg (v1 duplicate build)
+// ws7af — adds the 5-day hi/lo forecast strip to the hero mid-spacer (weather fetch now days=6; strip hidden when the daily feed is empty)
 // Injected into the client bundle right before `function wsWS` — module scope here already has:
 // n (jsx), b (react), WX_SVG, wxIco, wxIconKey, wmoBucket, fOf, inHg, fmt12, fmtHour, minsOf, DIRS,
 // rwRV (RainViewer animated radar block — injected by fdw-apply-radar-widgets.cjs before this comp)
@@ -42,7 +43,7 @@ function wxGUI(props) {
   b.useEffect(function () {
     let dead = false;
     const pull = function () {
-      fetch('/api/weather?zip=' + encodeURIComponent(zip) + '&units=fahrenheit&days=2').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) { setWx(j); setUpd(new Date()); } }).catch(function () {});
+      fetch('/api/weather?zip=' + encodeURIComponent(zip) + '&units=fahrenheit&days=6').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) { setWx(j); setUpd(new Date()); } }).catch(function () {});
     };
     pull(); const iv = setInterval(pull, 300000); return function () { dead = true; clearInterval(iv); };
   }, [zip]);
@@ -419,11 +420,33 @@ function wxGUI(props) {
   // (replaces the old full-width footer row: indoor-sensor text removed per user).
   // NOTE: declared BEFORE heroCard, which mounts it (avoid a TDZ ReferenceError).
   const updChip = n.jsx('div', { style: { position: 'absolute', top: '1.5cqh', right: '1.9cqw', zIndex: 3, fontSize: '1.05cqw', fontWeight: 600, letterSpacing: '.02em', color: 'rgba(226,236,247,.8)', textShadow: '0 1px 3px rgba(9,18,34,.4)', whiteSpace: 'nowrap' }, children: 'Weather updated ' + (updTimeStr || '\u2014') });
+  // ---- 5-day hi/lo strip (ws7af): pinned to the bottom edge of the hero mid-spacer —
+  // under the condition pill, between the big outdoor reading on top and the
+  // OUTDOOR/INDOOR sensor columns in heroBottom. Renders nothing if the daily feed is empty.
+  const fx5 = (function () {
+    const cols = dly.slice(0, 5);
+    if (!cols.length || cols[0].max == null) return null;
+    const cells = [];
+    cols.forEach(function (d, i) {
+      const dn = i === 0 ? 'TODAY' : new Date(String(d.date) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+      const ic = wxIconKey(d.code != null ? d.code : 2, 1);
+      cells.push(n.jsxs('div', { key: 'fx' + i, style: { flex: '1 1 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.45cqh', minWidth: 0 }, children: [
+        n.jsx('div', { style: { fontSize: '.78cqw', fontWeight: 700, letterSpacing: '.1em', color: i === 0 ? '#c9d6e6' : '#7288a2' }, children: dn }),
+        wxIco(ic, '2.6cqh', { height: '2.6cqh', filter: 'brightness(1.15) saturate(1.05)' }),
+        n.jsx('div', { style: { fontSize: '2.2cqh', fontWeight: 800, color: '#f5b969', lineHeight: 1 }, children: d.max != null ? d.max + '\u00B0' : '\u2014' }),
+        n.jsx('div', { style: { fontSize: '1.72cqh', fontWeight: 600, color: '#93a7c0', lineHeight: 1 }, children: d.min != null ? d.min + '\u00B0' : '\u2014' })
+      ] }));
+    });
+    return n.jsxs('div', { style: { flexShrink: 0, borderTop: '1px solid rgba(255,255,255,.13)', paddingTop: '.6cqh' }, children: [
+      n.jsx('div', { style: Object.assign({}, st.lblS, { fontSize: '.82cqw' }), children: '5-DAY FORECAST' }),
+      n.jsxs('div', { style: { display: 'flex', alignItems: 'flex-start', marginTop: '.55cqh' }, children: cells })
+    ] });
+  })();
   const heroCard = n.jsxs('div', { style: Object.assign({}, st.card, { flex: '1.02 1 0', overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }), children: [
     n.jsx('div', { style: { position: 'absolute', inset: 0, zIndex: 1 }, children: skyKids }),
     n.jsxs('div', { style: { position: 'absolute', inset: 0, zIndex: 2, display: 'flex', flexDirection: 'column', padding: '1.5cqh 1.9cqw', minHeight: 0 }, children: [
       heroTop,
-      n.jsx('div', { style: { flex: '1 1 auto', minHeight: 0 } }),
+      n.jsx('div', { style: { flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: '.55cqh' }, children: fx5 || undefined }),
       heroBottom
     ] }),
     n.jsx('div', { style: { position: 'absolute', right: '1.9cqw', top: '7cqh', width: '20cqw', height: '14.8cqh', zIndex: 2, pointerEvents: 'none' }, children: wxScene }),
