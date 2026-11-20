@@ -89,7 +89,8 @@ function rwRV(props) {
       if (p === rvPos.current) return;
       const prevN = rvN.current;
       rvPos.current = p; rvN.current = p; rvK.current = 1 - rvK.current;
-      if (p === L - 1) rvHold.current = 2;
+      // rvT32b — COD-HRRR futures are hourly, so dwell 3 beats (~1.9 s) on them (newest keeps its hold too)
+      if (p === L - 1 || (rvFrames[p] && rvFrames[p].cod)) rvHold.current = 2;
       setBuf({ n: p, o: prevN, k: rvK.current });
     }, 620);
     return function () { clearInterval(t); };
@@ -170,11 +171,14 @@ function rwRV(props) {
   // title+colour bars; the panel canvas is Web-Mercator, so slice the frame into 28 lat bands
   // and place each band at its exact Mercator rect — plain background sprites on the existing
   // OZ-tile wrapper (no canvas readback, no CORS dependency, no per-frame decode cost).
+  // rvT32b (ws6zz): mY must be HALF-world (÷2) to match the OZ tile grid's y normalization
+  // (fyO = (1−ln/π)/2·nTo, cpyO = fyO·TS) — the un-divided mY put bands a full world-height
+  // too low (≈ +95k px offscreen). Futures now also hold 3 beats (~1.9 s) instead of 1.
   const rvCodBands = function (f, fi) {
     const dm = rvCodDims ? rvCodDims[f.path] : null;
     if (!dm || dm.err || !dm.w || !dm.h) return null;
     const S = 28, BB = f.bb, bar = (f.cod === 'WLD') ? 42 : 26;
-    const mY = function (la) { const rr = la * Math.PI / 180; return (1 - Math.log(Math.tan(rr) + 1 / Math.cos(rr)) / Math.PI) * nTo; };
+    const mY = function (la) { const rr = la * Math.PI / 180; return ((1 - Math.log(Math.tan(rr) + 1 / Math.cos(rr)) / Math.PI) / 2) * nTo; };
     const xL = (BB[0] + 180) / 360 * nTo * TS;
     const Wp = (BB[2] - BB[0]) / 360 * nTo * TS;
     if (!(Wp > 0) || !(nTo > 0)) return null;
