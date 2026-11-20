@@ -157,7 +157,26 @@ function rwRV(props) {
     const rvCdPush = function (k, v) { if (!cdAlive) return; rvCodSet(function (x) { const y = Object.assign({}, x); y[k] = v; return y; }); };
     for (let F = 0; F < rvFrames.length; F++) {
       const f = rvFrames[F]; if (!f || !f.path) continue;
-      if (f.cod) { const im = new Image(); im.onload = function () { rvCdPush(f.path, { w: im.naturalWidth || 800, h: im.naturalHeight || 600 }); }; im.onerror = function () { rvCdPush(f.path, { err: 1 }); }; im.src = f.path; ims.push(im); continue; }
+      if (f.cod) { const im = new Image(); im.onload = function () {
+        const w0 = im.naturalWidth || 800, h0 = im.naturalHeight || 600;
+        let url = null;
+        try {
+          const cv = document.createElement('canvas'); cv.width = w0; cv.height = h0;
+          const cx = cv.getContext('2d'); if (!cx) throw new Error('no2d');
+          cx.drawImage(im, 0, 0);
+          const dt = cx.getImageData(0, 0, w0, h0), dp = dt.data; let ch = 0;
+          for (let P = 0; P < dp.length; P += 4) {
+            const sp = Math.max(dp[P], dp[P + 1], dp[P + 2]) - Math.min(dp[P], dp[P + 1], dp[P + 2]);
+            if (sp >= 20 && !(dp[P + 2] > dp[P] + 25 && dp[P + 2] > dp[P + 1] + 25)) { ch++; } else { dp[P + 3] = 0; }
+          }
+          if (ch < w0 * h0 / 40) throw new Error('emptykey');
+          url = cv.toDataURL('image/png');
+        } catch (e) { url = null; }
+        rvCdPush(f.path, { w: w0, h: h0, url: url });
+      }; im.onerror = function () {
+        if (!im.dataset.raw) { im.dataset.raw = 1; const im2 = new Image(); im2.onload = function () { rvCdPush(f.path, { w: im2.naturalWidth || 800, h: im2.naturalHeight || 600, url: null }); }; im2.onerror = function () { rvCdPush(f.path, { err: 1 }); }; im2.src = f.path; ims.push(im2); return; }
+        rvCdPush(f.path, { err: 1 });
+      }; im.crossOrigin = 'anonymous'; im.src = f.path; ims.push(im); continue; }
       for (let T = 0; T < rvTiles.length; T++) { const t = rvTiles[T]; try { const im = new Image(); im.src = rvData.host + f.path + '/' + TS + '/' + OZ + '/' + t.wx + '/' + t.y + '/' + COLRV + '/1_1.png'; ims.push(im); } catch (e) {} }
     }
     rvPre.current = ims;
@@ -174,6 +193,13 @@ function rwRV(props) {
   // rvT32b (ws6zz): mY must be HALF-world (÷2) to match the OZ tile grid's y normalization
   // (fyO = (1−ln/π)/2·nTo, cpyO = fyO·TS) — the un-divided mY put bands a full world-height
   // too low (≈ +95k px offscreen). Futures now also hold 3 beats (~1.9 s) instead of 1.
+  // rvT32c (ws7aa) — quality pass: the NEXLAB sector PNGs are 800×600 (38 px/° on SE) with a
+  // BAKED white land / gray wind-barb / blue-river background that (a) painted over our crisp
+  // OSM base (the "map goes blurry when futures start" report) and (b) washed the radar color
+  // look vs the past-radar frames. The preload now renders each frame to a canvas (COD serves
+  // `Access-Control-Allow-Origin: *`, verified) and KEYS OUT the background (alpha 0) keeping
+  // only radar-family pixels; bands draw the keyed data URL. Fallbacks: canvas/CORS failure ->
+  // unkeyed raw image (old look), 404 -> err:1 as before. Bands also overlap 2 px (seam lines).
   const rvCodBands = function (f, fi) {
     const dm = rvCodDims ? rvCodDims[f.path] : null;
     if (!dm || dm.err || !dm.w || !dm.h) return null;
@@ -195,7 +221,7 @@ function rwRV(props) {
       const srcRows = Hc / S;
       const kY = Hp / srcRows;
       const srcTop = bar + srcRows * Sx;
-      arr.push(n.jsx('div', { style: { position: 'absolute', left: xL + 'px', top: yT + 'px', width: Wp + 'px', height: Hp + 'px', backgroundImage: 'url(' + f.path + ')', backgroundSize: (kX * dm.w) + 'px ' + (kY * dm.h) + 'px', backgroundPosition: '0px -' + (srcTop * kY) + 'px', backgroundRepeat: 'no-repeat', pointerEvents: 'none' } }, 'cd' + fi + 'b' + Sx));
+      arr.push(n.jsx('div', { style: { position: 'absolute', left: xL + 'px', top: yT + 'px', width: Wp + 'px', height: (Hp + 2) + 'px', backgroundImage: 'url(' + (dm.url || f.path) + ')', backgroundSize: (kX * dm.w) + 'px ' + (kY * dm.h) + 'px', backgroundPosition: '0px -' + (srcTop * kY) + 'px', backgroundRepeat: 'no-repeat', pointerEvents: 'none' } }, 'cd' + fi + 'b' + Sx));
     }
     return arr;
   };
