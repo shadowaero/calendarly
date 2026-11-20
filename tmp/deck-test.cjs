@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// deck-test.cjs — ws7am radar deck + ws7ao wx credit micro-wave (Rainbow primary: the edge snapshot comes from /radar/api/snapshot; deck
-// = 7 past frames + ONE nowcast frame at +2 h (offset 7200 — frame count is the quota lever and
-// offset reach is free, so one further-out frame keeps the ws7aj burn), tiles through /radar/api
-// with the key on the server; the RainViewer path is kept as automatic fallback so the slice(-7)
-// timeline + the ws7ah beat engine stay). Asserts the rbk deck builder + fallback timeline +
-// ws7ah beat engine + 1.24s full-dwell crossfade + tokens across all kits.
+// deck-test.cjs — ws7ar quota-ladder radar deck + ws7ao wx credit micro-wave (Rainbow primary: the edge snapshot comes from /radar/api/snapshot; deck
+// = 7 real frames + a tier tail scaled by the proxy's usage.left (from /radar/api/health) — tier
+// 2: six future steps +10..+60 (13-frame deck), tier 1: +20/+40/+60 (10 frames), tier 0: ONE +2 h
+// frame (offset 7200, the ws7am deck; frame count is the quota lever and offset reach is free),
+// tiles through /radar/api with the key on the server; the RainViewer path is kept as automatic
+// fallback so the slice(-7) timeline + the ws7ah beat engine stay). Asserts the rbk ladder builder
+// + the tier-0 deck micro + fallback timeline + ws7ah beat engine + 1.24s crossfade + tokens.
 const fs = require('fs');
 const R = 'c:/Users/xxtoo/Documents/IDX6011/';
 const comp = fs.readFileSync(R + 'wave4/fd_weather/rw-rainview-comp.js', 'utf8');
@@ -18,17 +19,25 @@ const xp = fs.readFileSync(R + 'tmp/future/fdw-apply-wx5.cjs', 'utf8');
 const cnt = function (s, needle) { return s.split(needle).length - 1; };
 const results = [];
 const want = function (name, got, exp) { results.push([name, got, exp]); };
-want('comp.token', cnt(comp, 'ws7am') >= 1, true);
+want('comp.token', cnt(comp, 'ws7ar') >= 1, true);
 want('comp.fcst7200', cnt(comp, 'o: 7200'), 1);
 want('comp.fcstSweepGone', cnt(comp, 'F2 <= 6'), 0);
 want('comp.fcst1800Gone', cnt(comp, 'o: 1800'), 0);
 want('comp.rvT30Gone', cnt(comp, 'rvT30'), 0);
 want('comp.rbkFloorGone', cnt(comp, 'Math.floor(Date.now() / 600000)'), 0);
 want('comp.rbkSnapFetch', cnt(comp, '/radar/api/snapshot') >= 1, true);
-want('comp.rbkHealth', cnt(comp, '/radar/api/health'), 1);
+want('comp.rbkHealth', cnt(comp, '/radar/api/health') >= 2, true);
 want('comp.rbkProxyUrl', cnt(comp, 'precip-global'), 2);
 want('comp.rbkFcst', cnt(comp, 'o: 7200'), 1);
 want('comp.rbkFcstPath', cnt(comp, "path: 'rbkF'"), 1);
+want('comp.rbkTier', cnt(comp, 'rbkTier'), 3);
+want('comp.leftRef', cnt(comp, 'rbkLeft'), 4);
+want('comp.healthLeft', cnt(comp, 'j3.usage.left'), 2);
+want('comp.ladderTh', cnt(comp, '(l >= 7800') + cnt(comp, '(l >= 7000'), 2);
+want('comp.ladderT2', cnt(comp, 'F3 <= 3600') + cnt(comp, 'F3 += 600'), 2);
+want('comp.ladderT1', cnt(comp, 'F4 <= 3600') + cnt(comp, 'F4 += 1200'), 2);
+want('comp.ladderMemo', cnt(comp, 'old.tier === t3'), 1);
+want('comp.tierField', cnt(comp, 'tier: tier'), 1);
 want('comp.timeline.slice7', cnt(comp, '.slice(-7).concat(rvNC)'), 1);
 want('comp.timeline.slice9Gone', cnt(comp, '.slice(-9).concat'), 0);
 want('comp.timeline.slice6Gone', cnt(comp, '.slice(-6).concat'), 0);
@@ -58,10 +67,10 @@ want('comp.zoom13Load', cnt(comp, 'lz >= 3 && lz <= 13'), 1);
 want('comp.zoom12Gone', cnt(comp, '3), 12)') + cnt(comp, 'lz <= 12'), 0);
 want('comp.ozRbk', cnt(comp, 'const OZ = Math.min(rvZoom, rvRBK ? 10 : 7)'), 1);
 want('comp.oz7Gone', cnt(comp, 'const OZ = Math.min(rvZoom, 7)'), 0);
-want('widgets.ver', cnt(wp, "const jsVer = 'ws7am';"), 1);
-want('widgets.staleTokens', cnt(wp, 'ws7aa') + cnt(wp, 'ws7ab') + cnt(wp, 'ws7ac') + cnt(wp, 'ws7ad') + cnt(wp, 'ws7ae') + cnt(wp, 'ws7af') + cnt(wp, 'ws7ag') + cnt(wp, 'ws7ah') + cnt(wp, 'ws7ai') + cnt(wp, 'ws7aj') + cnt(wp, 'ws7ak'), 0);
-want('nas.ver', cnt(np, "const jsVer = 'ws7am';"), 1);
-want('nas.staleTokens', cnt(np, 'ws7aa') + cnt(np, 'ws7ab') + cnt(np, 'ws7ac') + cnt(np, 'ws7ad') + cnt(np, 'ws7ae') + cnt(np, 'ws7af') + cnt(np, 'ws7ag') + cnt(np, 'ws7ah') + cnt(np, 'ws7ai') + cnt(np, 'ws7aj') + cnt(np, 'ws7ak'), 0);
+want('widgets.ver', cnt(wp, "const jsVer = 'ws7ar';"), 1);
+want('widgets.staleTokens', cnt(wp, 'ws7aa') + cnt(wp, 'ws7ab') + cnt(wp, 'ws7ac') + cnt(wp, 'ws7ad') + cnt(wp, 'ws7ae') + cnt(wp, 'ws7af') + cnt(wp, 'ws7ag') + cnt(wp, 'ws7ah') + cnt(wp, 'ws7ai') + cnt(wp, 'ws7aj') + cnt(wp, 'ws7ak') + cnt(wp, 'ws7al') + cnt(wp, 'ws7am'), 0);
+want('nas.ver', cnt(np, "const jsVer = 'ws7ar';"), 1);
+want('nas.staleTokens', cnt(np, 'ws7aa') + cnt(np, 'ws7ab') + cnt(np, 'ws7ac') + cnt(np, 'ws7ad') + cnt(np, 'ws7ae') + cnt(np, 'ws7af') + cnt(np, 'ws7ag') + cnt(np, 'ws7ah') + cnt(np, 'ws7ai') + cnt(np, 'ws7aj') + cnt(np, 'ws7ak') + cnt(np, 'ws7al') + cnt(np, 'ws7am'), 0);
 want('wxgui6.rvT32ChecksGone', cnt(wsh, 'rvT32') + cnt(wsh, 'cod-HRRR'), 0);
 want('wxgui6.rwXFKept', cnt(wsh, 'opacity 1.24s linear'), 1);
 want('wxgui6.rwMIGate', cnt(wsh, 'rwMI:'), 1);
@@ -69,6 +78,7 @@ want('wxgui6.rwTmGate', cnt(wsh, '.slice(-7).concat(rvNC)'), 1);
 want('wxgui6.rwTm9GoneGate', cnt(wsh, '.slice(-9).concat") < 0'), 1);
 want('wxgui6.rwTm6GoneGate', cnt(wsh, '.slice(-6).concat") < 0'), 1);
 want('wxgui6.rbkDeckGate', cnt(wsh, 'rbkDeck'), 1);
+want('wxgui6.rbkLadderGate', cnt(wsh, 'rbkLadder:'), 1);
 want('wxgui6.rbkNoUpstreamGate', cnt(wsh, 'rbkNoUpstream'), 1);
 want('wxgui6.formRainbowGate', cnt(wsh, 'Rainbow Radar Config'), 1);
 want('wxgui6.rwOzGate', cnt(wsh, 'rwOz:'), 1);
@@ -77,7 +87,8 @@ want('wxgui6.n12Gate', cnt(wsh, 'n12Gone:'), 1);
 want('wxgui6.omHalfGate', cnt(wsh, 'omHalf:'), 1);
 want('wxgui6.omNudgeGate', cnt(wsh, 'omNudge:'), 1);
 want('wxgui6.wxAnimGate', cnt(wsh, 'wxAnim:'), 1);
-want('eventedit.curToken', cnt(ev, '?v=ws7aq'), 2);
+want('eventedit.curToken', cnt(ev, '?v=ws7ar'), 2);
+want('eventedit.staleHas7aq', cnt(ev, "grep -c '?v=ws7aq'"), 1);
 want('eventedit.staleHas7al', cnt(ev, "grep -c '?v=ws7al'"), 1);
 want('eventedit.staleHas7am', cnt(ev, "grep -c '?v=ws7am'"), 1);
 want('eventedit.staleHas7an', cnt(ev, "grep -c '?v=ws7an'"), 1);
@@ -111,9 +122,10 @@ want('wxc.n12Gone', cnt(wxc, 'NEXT 12H'), 0);
 want('wx5.ver', cnt(xp, "const jsVer = 'ws7aq';"), 1);
 want('wx5.orig8', cnt(xp, 'orig8.'), 4);
 want('wx5.guardFx5', cnt(xp, 'fx5='), 1);
-want('shipnas.token', cnt(sn, 'const TOKEN = "ws7am";'), 1);
-want('shipnas.staleToken', cnt(sn, 'ws7ah') + cnt(sn, 'ws7ai') + cnt(sn, 'ws7aj') + cnt(sn, 'ws7ak') + cnt(sn, 'ws7al'), 0);
+want('shipnas.token', cnt(sn, 'const TOKEN = "ws7ar";'), 1);
+want('shipnas.staleToken', cnt(sn, 'ws7ah') + cnt(sn, 'ws7ai') + cnt(sn, 'ws7aj') + cnt(sn, 'ws7ak') + cnt(sn, 'ws7al') + cnt(sn, 'ws7am'), 0);
 want('shipnas.fcstGate', cnt(sn, "js.includes('o: 7200')"), 1);
+want('shipnas.ladderGate', cnt(sn, "js.includes('usage.left')") + cnt(sn, "js.includes('F3 <= 3600')"), 2);
 want('shipnas.absenceChecks', cnt(sn, "js.includes('prec_radar')?0:1") + cnt(sn, "js.includes('sint/')?0:1") + cnt(sn, "js.includes('rvHR')?0:1"), 3);
 want('shipnas.slice7', cnt(sn, ".slice(-7).concat(rvNC"), 1);
 want('shipnas.slice9Gone', cnt(sn, "js.includes('.slice(-9).concat')?0:1"), 1);
@@ -175,6 +187,25 @@ want('rbkDeck.fcstEdgeSnap', frR[7].s, rbkSnap);
 want('rbkDeck.spanMin', Math.round((frR[7].time - frR[0].time) / 60), 180);
 want('rbkDeck.proxyUrlPast', ('/radar/api/tiles/v1/precip-global/' + frR[3].s + '/' + frR[3].o + '/7/17/26?color=8').indexOf('/radar/api/tiles/v1/precip-global/' + (rbkSnap - 3 * 600) + '/0/7/17/26?color=8'), 0);
 want('rbkDeck.proxyUrlFcst', ('/radar/api/tiles/v1/precip-global/' + frR[7].s + '/' + frR[7].o + '/7/17/26?color=8').indexOf('/radar/api/tiles/v1/precip-global/' + rbkSnap + '/7200/7/17/26?color=8'), 0);
+// micro (ws7ar ladder): tier-2 = six real future steps +10..+60 (13-frame deck, 2 h wall span);
+// tier-1 = every other step +20/+40/+60 (10-frame deck); tier-0 stays the +2 h tail (the rbkDeck
+// micro above). The future tail is the only fresh-mint cost per publish roll (past frames recycle
+// earlier rolls' disk cache); the ladder picks the tier from usage.left (9300 budget: tiers run
+// ~970 / ~610 / ~250 calls/day measured, so thresholds 7800/7000 keep every month inside the 9300
+// brake with margin, sweep early-month and never collapse).
+const frT2 = []; for (let K = 6; K >= 1; K--) frT2.push({ time: rbkSnap - K * 600, s: rbkSnap - K * 600, o: 0, rbk: 1, path: 'rbk' + K }); frT2.push({ time: rbkSnap, s: rbkSnap, o: 0, rbk: 1, path: 'rbk0' }); for (let F = 600; F <= 3600; F += 600) frT2.push({ time: rbkSnap + F, s: rbkSnap, o: F, rbk: 1, path: 'rbkFw' + F });
+want('ladder.t2.len', frT2.length, 13);
+want('ladder.t2.fcsts', frT2.slice(7).map(function (f2) { return f2.o; }).join(','), '600,1200,1800,2400,3000,3600');
+want('ladder.t2.spanMin', Math.round((frT2[12].time - frT2[0].time) / 60), 120);
+want('ladder.t2.step10', (frT2[8].time - frT2[7].time) / 60, 10);
+want('ladder.t2.url', ('/radar/api/tiles/v1/precip-global/' + frT2[7].s + '/' + frT2[7].o + '/7/17/26?color=8').indexOf('/radar/api/tiles/v1/precip-global/' + rbkSnap + '/600/7/17/26?color=8'), 0);
+const frT1 = []; for (let K = 6; K >= 1; K--) frT1.push({ time: rbkSnap - K * 600, s: rbkSnap - K * 600, o: 0, rbk: 1, path: 'rbk' + K }); frT1.push({ time: rbkSnap, s: rbkSnap, o: 0, rbk: 1, path: 'rbk0' }); for (let F = 1200; F <= 3600; F += 1200) frT1.push({ time: rbkSnap + F, s: rbkSnap, o: F, rbk: 1, path: 'rbkFw' + F });
+want('ladder.t1.len', frT1.length, 10);
+want('ladder.t1.fcsts', frT1.slice(7).map(function (f2) { return f2.o; }).join(','), '1200,2400,3600');
+const rbkTestTier = function (l) { return (l == null) ? 0 : (l >= 7800 ? 2 : (l >= 7000 ? 1 : 0)); };
+want('ladder.map', [9300, 7800, 7799, 7000, 6999, null].map(rbkTestTier).join(''), '221100');
+want('ladder.mapRich', rbkTestTier(9299), 2);
+want('ladder.mapTrim', rbkTestTier(7799) + '' + rbkTestTier(6999), '10');
 // micro (ws7ak): per-source overlay zoom — Rainbow frames render native to z10 (real data
 // probed at z8-10; z11/12 blank upstream), RainViewer frames stay at its z7 tilecache cap; the
 // scale(OV) wrapper upscales rvZoom beyond the cap (never blank, never raw z7 mush).

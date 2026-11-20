@@ -49,13 +49,15 @@ function rwRV(props) {
   const pvMove = function (e) { if (!CTL || rvPinch.current == null || !e.touches || e.touches.length !== 2) return; const dx = e.touches[0].clientX - e.touches[1].clientX, dy = e.touches[0].clientY - e.touches[1].clientY; const d = Math.sqrt(dx * dx + dy * dy); const r = d / rvPinch.current; if (r > 1.35) { rvSet(rvZoom + 1); rvPinch.current = d; } else if (r < 0.74) { rvSet(rvZoom - 1); rvPinch.current = d; } };
   const pvEnd = function () { rvPinch.current = null; };
   const rvD = b.useState(null); const rvData = rvD[0]; const setRvData = rvD[1];
-  // ws7aj state: rbkOK = proxy health (null unknown / 1 ok / 0 down), rbkSnap = { s, f } with the
-  // AUTHORED edge snapshot (proxy-served from Rainbow's snapshot endpoint; the published edge is
-  // NOT wall-clock — it lags real time — so the deck never derives it locally; the proxy caches
-  // it for 2 min and keeps the last good) and its 8-frame deck (7 past + the +2 h FCST frame);
-  // refreshed every 2 min.
+  // ws7aj state: rbkOK = proxy health (null unknown / 1 ok / 0 down), rbkSnap = { s, tier, f }
+  // with the AUTHORED edge snapshot (proxy-served from Rainbow's snapshot endpoint; the published
+  // edge is NOT wall-clock — it lags real time — so the deck never derives it locally; the proxy
+  // caches it for 2 min and keeps the last good) and its ladder deck (7 real frames + the
+  // tier-scaled future tail of ws7ar); refreshed every 2 min. rbkLeft = the proxy's monthly-quota
+  // meter (health usage.left) that picks the tier; the tier ladder itself lives in rbkTier below.
   const rbkH = b.useState(null); const rbkOK = rbkH[0]; const setRbkOK = rbkH[1];
   const rbkM = b.useState(null); const rbkSnap = rbkM[0]; const setRbkSnap = rbkM[1];
+  const rbkLeft = b.useRef(null);
   b.useEffect(function () {
     let dead = false;
     const hp = function () { fetch('/radar/api/health', { cache: 'no-store' }).then(function (r) { if (!dead) setRbkOK(r.ok ? 1 : 0); }).catch(function () { if (!dead) setRbkOK(0); }); };
@@ -63,22 +65,38 @@ function rwRV(props) {
   }, []);
   b.useEffect(function () {
     let dead = false;
-    const rbkBuild = function (s) {
+    // ws7ar ladder — the proxy quota charges ~9-12 upstream tiles per (snap, offset) family minted
+    // on each publish roll, and only FRESH future offsets are new mints every roll (past frames
+    // recycle disk cache from earlier rolls), so the future tail COUNT is the quota lever (offset
+    // reach is free). The ws7am pre-flight measured a 6-step first-hour sweep at ~900-1100
+    // upstream calls/day vs the 9300/month brake — it would trip in ~8 days and kill the future
+    // tail until the month reset. This ladder instead scales the tail to usage.left (read fresh
+    // from /radar/api/health on every tick, ordered before the snapshot fetch): tier 2 = six real
+    // steps +10..+60 (13-frame deck); tier 1 = every other step +20/+40/+60 (10 frames); tier 0 =
+    // the single +2 h frame (8 frames). Thresholds 7800/7000 are budget-balanced against the
+    // measured per-tier burn (~970 / ~610 / ~250 calls/day), so a rich meter sweeps, a draining
+    // meter trims gracefully, and the deck never collapses (unknown left stays starve-safe on
+    // tier 0; the monthly reset restores the sweep automatically). Real anchors stay on Rainbow's
+    // 10-min grid — a literal 5-min offset would be rejected (snap/offset lattice is 600 s).
+    const rbkTier = function (l) { return (l == null) ? 0 : (l >= 7800 ? 2 : (l >= 7000 ? 1 : 0)); };
+    const rbkBuild = function (s, tier) {
       const fr = [];
       for (let K2 = 6; K2 >= 1; K2--) fr.push({ time: s - K2 * 600, s: s - K2 * 600, o: 0, rbk: 1, path: 'rbk' + K2 });
       fr.push({ time: s, s: s, o: 0, rbk: 1, path: 'rbk0' });
-      // ws7am: tail = ONE nowcast frame at +2 h (offset 7200 — guaranteed like every Rainbow step
-      // <= 14400). The proxy quota charges per (snap, offset) family minted on each publish roll,
-      // so frame COUNT is what scales cost while offset magnitude is free — a single +2 h frame
-      // burns the same ~12 tiles/roll as the old +30 m frame (ws7aj) at 4x the reach.
-      fr.push({ time: s + 7200, s: s, o: 7200, rbk: 1, path: 'rbkF' });
-      return { s: s, f: fr };
+      if (tier === 2) { for (let F3 = 600; F3 <= 3600; F3 += 600) fr.push({ time: s + F3, s: s, o: F3, rbk: 1, path: 'rbkFw' + F3 }); }
+      else if (tier === 1) { for (let F4 = 1200; F4 <= 3600; F4 += 1200) fr.push({ time: s + F4, s: s, o: F4, rbk: 1, path: 'rbkFw' + F4 }); }
+      else { fr.push({ time: s + 7200, s: s, o: 7200, rbk: 1, path: 'rbkF' }); }
+      return { s: s, tier: tier, f: fr };
     };
     const tk = function () {
       if (dead) return;
-      fetch('/radar/api/snapshot', { cache: 'no-store' }).then(function (r2) { return r2.ok ? r2.json() : Promise.reject(new Error('http ' + r2.status)); }).then(function (j2) {
+      fetch('/radar/api/health', { cache: 'no-store' }).then(function (r3) { return (r3 && r3.ok) ? r3.json() : null; }).then(function (j3) {
+        if (j3 && j3.usage && Number.isFinite(j3.usage.left)) rbkLeft.current = j3.usage.left;
+        return fetch('/radar/api/snapshot', { cache: 'no-store' });
+      }).then(function (r2) { return r2.ok ? r2.json() : Promise.reject(new Error('http ' + r2.status)); }).then(function (j2) {
         if (dead || !j2 || !j2.snapshot) return;
-        setRbkSnap(function (old) { return (old && old.s === j2.snapshot) ? old : rbkBuild(j2.snapshot); });
+        const t3 = rbkTier(rbkLeft.current);
+        setRbkSnap(function (old) { return (old && old.s === j2.snapshot && old.tier === t3) ? old : rbkBuild(j2.snapshot, t3); });
       }).catch(function () {});
     };
     tk(); const iv2 = setInterval(tk, 120000); return function () { dead = true; clearInterval(iv2); };
@@ -97,21 +115,23 @@ function rwRV(props) {
     const pull = function () { fetch('https://api.rainviewer.com/public/weather-maps.json').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setRvData(j); }).catch(function () { if (!dead) setRvData(null); }); };
     pull(); const iv = setInterval(pull, 300000); return function () { dead = true; clearInterval(iv); };
   }, []);
-  // ws7am timeline: Rainbow mode (proxy healthy) = the derived 8-frame deck — 7 past frames at
-  // the fixed 10-min cadence + ONE nowcast frame at +2 h (offset 7200; measured on the live
-  // proxy 2026-11-20: every publish roll mints its (snap, offset) family at ~12 tiles, so
-  // frame count is the quota lever and offset reach is free — a 6-frame +1 h sweep measured at
-  // ~900+ upstream calls/day vs the 9300/month brake, the single +2 h frame keeps today's burn).
+  // ws7ar timeline: Rainbow mode (proxy healthy) = the ladder deck — 7 real frames of the past
+  // hour at the fixed 10-min cadence + a tier tail chosen by the quota ladder above: tier 2 =
+  // six future steps +10..+60, tier 1 = +20/+40/+60, tier 0 = the single +2 h frame (offset
+  // 7200; measured on the live proxy 2026-11-20: every publish roll mints its (snap, offset)
+  // family at ~12 tiles and only FRESH future families are new mints each roll — past frames
+  // recycle earlier rolls' disk cache — so the tail COUNT is the quota lever and offset reach
+  // is free; the blind 6-step sweep measured ~900+ upstream calls/day vs the 9300/month brake,
+  // hence the ladder instead of a fixed ramp).
   // Fallback mode (rbkOK 0/ null, or no data yet): the original RainViewer deck — the last 7
   // past frames (1 h sweep at RainViewer's 10-min publish cadence; the timeline refetch below
   // runs every 5 min so new frames land within ≤5 min) + the free +30 min nowcast tail when
   // upstream serves it (probed 2026-11-20 weather-maps.json even served "nowcast":[] — the tail
   // appears by itself when frames return). Wall: 1 h + FCST in both modes.
   // Playback (ws7ah) halves the perceived step: each crossfade spans TWO 620 ms beats and the
-  // HUD clock ticks in interpolated 5-min stamps (midpoint beats — the NOW->+2 h jump shows the
-  // interpolated ~+1 h stamp while the two frames blend), so the sweep reads like RainViewer's
-  // site — motion stays continuous; the loop runs ~9.9 s without FCST, ~11.2 s with, and the
-  // tile prefetch stays 8 frames.
+  // HUD clock ticks in interpolated 5-min stamps between adjacent real anchors (10 min apart),
+  // so an anchor sweep reads in ~5-minute increments — motion stays continuous; the loop runs
+  // ~9.9 s without FCST, ~11.2-16.1 s with the tier tail, and the prefetch covers the whole deck.
   const rvNC = (rvData && rvData.radar && rvData.radar.nowcast) ? rvData.radar.nowcast : [];
   const rvRBK = (rbkOK === 1 && rbkSnap);
   const rvFrames = (rvRBK && rbkSnap) ? rbkSnap.f : (rvData && rvData.radar) ? (rvData.radar.past || []).slice(-7).concat(rvNC) : [];

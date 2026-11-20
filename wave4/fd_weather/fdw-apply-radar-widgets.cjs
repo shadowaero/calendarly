@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// FD radar-widgets patcher rbT30 (?v=ws7am). Runs on the Pi: sudo node /tmp/fdw-apply-radar-widgets.cjs
+// FD radar-widgets patcher rbT30/ws7ar (?v=ws7ar). Runs on the Pi: sudo node /tmp/fdw-apply-radar-widgets.cjs
 // Adds two resizable radar block types for screens studio: "radar_windy" (Windy iframe embed)
 // and "radar_rainviewer" (RainViewer public API over dark OSM base). Injects components right
 // BEFORE the `// wxGUI` marker (so the wxgui patcher's upgrade slice never deletes them), plus
@@ -8,7 +8,7 @@
 // Rollback: cp orig7.<name> <name> + restart lightdm.
 const fs = require('fs');
 const path = require('path');
-const jsVer = 'ws7am';
+const jsVer = 'ws7ar';
 const report = { steps: [], ok: true };
 const step = (name, status, extra) => { report.steps.push({ name, status, extra }); console.log('[' + status + '] ' + name + (extra ? ' :: ' + extra : '')); if (status === 'FAIL') report.ok = false; };
 const dist = process.env.FDW_DIST || '/opt/calendarly/client/dist';
@@ -104,9 +104,9 @@ one('rainbow.formTitle', 'children:"Rainbow Radar Config"', 'children:"RainViewe
 one('rainbow.palette', 'rainbowP:1', '(x.config||{}).color??6,onChange:L=>p(h,{color:Number(L.target.value)})', '(x.config||{}).color??8,onChange:L=>p(h,{color:Number(L.target.value),rainbowP:1})');
 one('rainbow.opts', 'value:4,children:"Nexrad"', 'children:[n.jsx("option",{value:6,children:"Dark Sky"}),n.jsx("option",{value:8,children:"Dark Sky Alt"}),n.jsx("option",{value:4,children:"Rainbow"}),n.jsx("option",{value:2,children:"Universal Blue"}),n.jsx("option",{value:0,children:"Classic"}),n.jsx("option",{value:3,children:"Titan"})]', 'children:[n.jsx("option",{value:8,children:"Universal Blue"}),n.jsx("option",{value:4,children:"Nexrad"}),n.jsx("option",{value:5,children:"Rainviewer"}),n.jsx("option",{value:0,children:"Semi-Classic"}),n.jsx("option",{value:1,children:"Original"}),n.jsx("option",{value:2,children:"Rainbow SELEX"}),n.jsx("option",{value:3,children:"Titan"}),n.jsx("option",{value:6,children:"Palette 6"}),n.jsx("option",{value:7,children:"Palette 7"}),n.jsx("option",{value:9,children:"Palette 9"})]');
 one('rainbow.label', 'return"Radar: Rainbow"', 'case"radar_rainviewer":return"Radar: RainViewer"', 'case"radar_rainviewer":return"Radar: Rainbow"');
-// ws7al zoom-ceiling pass: the comp region carries 3-13 now; the deployed form's zoom label gets
-// bumped in place, whichever pre-ws7al variant it holds (the fresh `Zoom (3-12, default 7)`
-// string or the older bare `Zoom (3-12)`); reruns SKIP on either 3-13 marker.
+// Zoom-ceiling pass: the comp region carries 3-13 now; the deployed form's zoom label gets
+// bumped in place, whichever older variant it holds (the fresh `Zoom (3-12, default 7)`
+// string or the bare `Zoom (3-12)`); reruns SKIP on either 3-13 marker.
 if (js.indexOf('Zoom (3-13') >= 0) step('zoom.label', 'SKIP', 'already 3-13');
 else if (js.split('children:"Zoom (3-12, default 7)"').length === 2) { js = js.replace('children:"Zoom (3-12, default 7)"', 'children:"Zoom (3-13, default 7)"'); step('zoom.label', 'OK', 'fresh 3-12 -> 3-13'); }
 else if (js.split('children:"Zoom (3-12)"').length === 2) { js = js.replace('children:"Zoom (3-12)"', 'children:"Zoom (3-13, default 7)"'); step('zoom.label', 'OK', 'bare 3-12 -> 3-13, default 7'); }
