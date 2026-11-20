@@ -16,12 +16,16 @@
 // ("nowcast":[] is upstream-intermittent; the tail reappears by itself).
 // Palette: Rainbow tiles use color=0..9 (4 "Nexrad", 5 "Rainviewer", 8 = "RainViewer Universal
 // Blue"); the stored RainViewer palette id maps to the closest Rainbow one (RV2RBK below).
-// config keys: lat, lon, zoom (3-11, default 7), color (palette id), label, pause (1 = freeze frame), ctl (1 = +/- zoom buttons + two-finger pinch on the map; zoom persists per label in localStorage)
+// config keys: lat, lon, zoom (3-12, default 7), color (palette id), label, pause (1 = freeze
+// frame), ctl (1 = +/- zoom buttons + two-finger pinch on the map; zoom persists per label in
+// localStorage). Zoom ceiling ws7ak: Rainbow's nowcast grid is native to z10 (live-probed: real
+// structure at z8/z9/z10 over a wet z7 cell, z11/12 blank) so rbk frames render to z10 and only
+// upscale beyond; RainViewer's public tilecache still caps at z7.
 function rwRV(props) {
   const a = (props && props.config) || {};
   const lat = isFinite(Number(a.lat)) ? Number(a.lat) : 28.817422;
   const lon = isFinite(Number(a.lon)) ? Number(a.lon) : -81.620514;
-  const NZ = Math.min(Math.max(Math.round(Number(a.zoom)) || 7, 3), 11);
+  const NZ = Math.min(Math.max(Math.round(Number(a.zoom)) || 7, 3), 12);
   // color semantics (ws7aj): config.rainbowP = 1 => a.color is ALREADY a Rainbow palette id
   // (blocks edited after the fork); otherwise a.color is a legacy RainViewer id mapped through
   // RV2RBK (the wall's stored 6 = RV "Dark Sky" -> Rainbow 8 "Universal Blue").
@@ -33,9 +37,9 @@ function rwRV(props) {
   const PAUSE = (a.pause === true || Number(a.pause) === 1);
   const CTL = (a.ctl === true || Number(a.ctl) === 1);
   let rvZ0 = NZ;
-  if (CTL) { try { const lz = Math.round(Number(localStorage.getItem('rwRVz:' + rvLabel))); if (lz >= 3 && lz <= 11) rvZ0 = lz; } catch (e) {} }
+  if (CTL) { try { const lz = Math.round(Number(localStorage.getItem('rwRVz:' + rvLabel))); if (lz >= 3 && lz <= 12) rvZ0 = lz; } catch (e) {} }
   const rvZ = b.useState(rvZ0); const rvZoom = rvZ[0];
-  const rvSet = function (z) { z = Math.min(Math.max(Math.round(Number(z)), 3), 11); if (CTL) { try { localStorage.setItem('rwRVz:' + rvLabel, String(z)); } catch (e) {} } rvZ[1](z); };
+  const rvSet = function (z) { z = Math.min(Math.max(Math.round(Number(z)), 3), 12); if (CTL) { try { localStorage.setItem('rwRVz:' + rvLabel, String(z)); } catch (e) {} } rvZ[1](z); };
   const rvPinch = b.useRef(null);
   const pvStart = function (e) { if (!CTL || !e.touches || e.touches.length !== 2) return; const dx = e.touches[0].clientX - e.touches[1].clientX, dy = e.touches[0].clientY - e.touches[1].clientY; rvPinch.current = Math.sqrt(dx * dx + dy * dy); };
   const pvMove = function (e) { if (!CTL || rvPinch.current == null || !e.touches || e.touches.length !== 2) return; const dx = e.touches[0].clientX - e.touches[1].clientX, dy = e.touches[0].clientY - e.touches[1].clientY; const d = Math.sqrt(dx * dx + dy * dy); const r = d / rvPinch.current; if (r > 1.35) { rvSet(rvZoom + 1); rvPinch.current = d; } else if (r < 0.74) { rvSet(rvZoom - 1); rvPinch.current = d; } };
@@ -164,8 +168,12 @@ function rwRV(props) {
   const rfy = (1 - Math.log(Math.tan(rra) + 1 / Math.cos(rra)) / Math.PI) / 2 * nT;
   const cpx = rfx * TS; const cpy = rfy * TS;
   const halfW = rvBox.w / 2; const halfH = rvBox.h / 2;
-  // RainViewer tilecache caps radar tiles at zoom 7 -> overlay at OZ<=7, scaled up to match NZ
-  const OZ = Math.min(rvZoom, 7);
+  // Per-source overlay caps (ws7ak): RainViewer's public tilecache caps radar tiles at zoom 7,
+  // Rainbow's nowcast grid is native to z10 (probed: real structure per level z8-10, z11+ blank)
+  // -> overlay renders at OZ<=10 for Rainbow frames / <=7 for RV frames, scaled up to match NZ
+  // (the existing OV scale wrapper handles rvZoom > OZ, so deep zooms never blank — they upscale
+  // the deepest REAL data instead of the old z7 mush).
+  const OZ = Math.min(rvZoom, rvRBK ? 10 : 7);
   const OV = Math.pow(2, rvZoom - OZ);
   const nTo = Math.pow(2, OZ);
   const fxO = (lon + 180) / 360 * nTo;
@@ -245,7 +253,8 @@ function rwRV(props) {
         return n.jsx('div', { style: { position: 'absolute', left: t.left + 'px', top: t.top + 'px', width: btS + 'px', height: btS + 'px', backgroundImage: 'url(https://tile.openstreetmap.org/' + BZ + '/' + t.wx + '/' + t.y + '.png)', backgroundSize: btS + 'px ' + btS + 'px', display: 'block', filter: 'invert(.88) hue-rotate(175deg) brightness(.85) saturate(.35)' } }, t.key);
       }),
       // rvXF — two stacked radar layers: the incoming frame stays blended over the outgoing one.
-      // GEOMETRY (rvXF wrapper): rain tiles live at zoom OZ (<=7, API cap) but the panel shows NZ,
+      // GEOMETRY (rvXF wrapper): rain tiles live at the overlay's native zoom (OZ<=10 for
+      // Rainbow frames, <=7 for RainViewer ones — server API caps) but the panel shows NZ,
       // so each layer wraps its tile grid in a scale(OV) wrapper pinned at (halfW - cpxO*OV,
       // halfH - cpyO*OV) with transformOrigin '0 0' — without it tiles land at raw zoom-7 px
       // coords (~9000px) far outside the panel and only the map shows.

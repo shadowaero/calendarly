@@ -116,7 +116,7 @@ function rbkTile(req, res, layer, offNum) {
   const ok = function (v) { return Number.isInteger(v); };
   if (!ok(snap) || !/^\d{10}$/.test(String(req.params.snap)) || snap % 600 !== 0) return res.status(400).json({ fallback: true, why: 'bad-snap' });
   if (!ok(off) || off % 600 !== 0 || off < 0 || off > (layer === 'radars' ? 0 : 14400)) return res.status(400).json({ fallback: true, why: 'bad-off' });
-  if (!ok(z) || !(z >= 1 && z <= 7) || !ok(x) || !ok(y) || !(x >= 0 && y >= 0 && x < Math.pow(2, z) && y < Math.pow(2, z))) return res.status(400).json({ fallback: true, why: 'bad-geo' });
+  if (!ok(z) || !(z >= 1 && z <= (layer === 'radars' ? 7 : 10)) || !ok(x) || !ok(y) || !(x >= 0 && y >= 0 && x < Math.pow(2, z) && y < Math.pow(2, z))) return res.status(400).json({ fallback: true, why: 'bad-geo' });
   const br = rbkBreaker();
   if (br.open || !rbkKeys.list.length) return res.status(503).set('Retry-After', '300').json({ fallback: true, why: br.open ? br.why : 'no-keys' });
   const file = path.join(TILE_DIR, layer + '_' + snap + '_' + off + '_' + z + '_' + x + '_' + y + '_' + col + '.png');
