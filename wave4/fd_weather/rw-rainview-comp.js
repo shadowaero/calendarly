@@ -1,9 +1,11 @@
 // rwRV — standalone RainViewer radar block (RainViewer public API animated over dark OSM base; resizable via block size)
-// Timeline (rvT30): the last ~80 min of radar — at RainViewer's fixed 10-min publish cadence that
-// is its last 9 past frames (the free API serves nothing finer; the timeline re-pull below runs
+// Timeline (rvT30): the last ~1 h of radar — at RainViewer's fixed 10-min publish cadence that
+// is its last 7 past frames (the free API serves nothing finer; the timeline re-pull below runs
 // every 5 min so a newly published frame appears within ≤5 min of going live) + RainViewer's
-// nowcast forecast when served, always playing FORWARD
-// in time (oldest -> now -> forecast, then wraps). Future frames get an "FCST +Nm" badge by the clock.
+// nowcast forecast when the free API generates it (its +30 min tail lives at radar.nowcast and
+// is UPSTREAM-INTERMITTENT: probed 2026-11-20 it returned 13 past frames but "nowcast":[] — the
+// concated tail reappears by itself the moment upstream serves frames again), always playing
+// FORWARD in time (oldest -> now -> forecast, then wraps). Future frames get an "FCST +Nm" badge.
 // config keys: lat, lon, zoom (3-11, default 7), color (palette id), label, pause (1 = freeze frame), ctl (1 = +/- zoom buttons + two-finger pinch on the map; zoom persists per label in localStorage)
 function rwRV(props) {
   const a = (props && props.config) || {};
@@ -37,17 +39,18 @@ function rwRV(props) {
     const pull = function () { fetch('https://api.rainviewer.com/public/weather-maps.json').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setRvData(j); }).catch(function () { if (!dead) setRvData(null); }); };
     pull(); const iv = setInterval(pull, 300000); return function () { dead = true; clearInterval(iv); };
   }, []);
-  // rvT30 (ws7ah) — timeline: the LAST 9 past frames = ~1 h 20 m of sweep at the fixed 10-min
+  // rvT30 (ws7ai) — timeline: the LAST 7 past frames = 1 h of sweep at the fixed 10-min
   // cadence of RainViewer's free API (upstream publishes one frame every 10 min — nothing finer
   // to pull; the timeline refetch below runs every 5 min, so new frames land within ≤5 min).
-  // The FCST frames concat on after when the free nowcast is served (~+30 min ahead). Was a
-  // 10-past/13-past split across nowcast states (ws7ad widening). Playback (ws7ah) halves the
-  // perceived step: each crossfade now spans TWO 620 ms beats and the HUD clock ticks in
-  // interpolated 5-min stamps (midpoint beats), so the sweep reads like RainViewer's site at
-  // half speed — motion stays continuous, the loop simply runs longer (~12.4 s without FCST,
-  // ~16 s with) and the tile prefetch stays 9-12 frames.
+  // The FCST frames concat on after when the free nowcast is served (the +30 min tail: +10/+20/+30;
+  // probed 2026-11-20 weather-maps.json served 13 past frames but "nowcast":[] — upstream-
+  // intermittent, the tail appears by itself when frames return). Wall: 80 min (ws7ag) -> 60 min.
+  // Playback (ws7ah) halves the perceived step: each crossfade spans TWO 620 ms beats and the
+  // HUD clock ticks in interpolated 5-min stamps (midpoint beats), so the sweep reads like
+  // RainViewer's site — motion stays continuous; the loop runs ~9.9 s without FCST, ~13.6 s
+  // with, and the tile prefetch stays 7-10 frames.
   const rvNC = (rvData && rvData.radar && rvData.radar.nowcast) ? rvData.radar.nowcast : [];
-  const rvFrames = (rvData && rvData.radar) ? (rvData.radar.past || []).slice(-9).concat(rvNC) : [];
+  const rvFrames = (rvData && rvData.radar) ? (rvData.radar.past || []).slice(-7).concat(rvNC) : [];
   // rvXF v4 (ws7ah) — full-dwell continuous blend + forward-only radar loop. Two stacked overlay
   // layers swap roles every second 620 ms beat: the outgoing frame fades out while the incoming
   // fades in ('opacity 1.24s linear' = the whole 2-beat crossfade), so the loop morphs
@@ -60,7 +63,7 @@ function rwRV(props) {
   // start on the NOW frame (latest past frame in the trimmed timeline); rebuild when frames change
   b.useEffect(function () {
     if (!rvData || !rvData.radar) return;
-    const nPast = Math.min((rvData.radar.past || []).length, 9);
+    const nPast = Math.min((rvData.radar.past || []).length, 7);
     const L = rvFrames.length;
     const cur = nPast > 0 ? nPast - 1 : Math.max(0, L - 1);
     rvPos.current = cur; rvN.current = cur; rvK.current = 0; rvHold.current = 0; rvBeat.current = 0;
