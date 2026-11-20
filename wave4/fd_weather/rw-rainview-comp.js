@@ -16,16 +16,18 @@
 // ("nowcast":[] is upstream-intermittent; the tail reappears by itself).
 // Palette: Rainbow tiles use color=0..9 (4 "Nexrad", 5 "Rainviewer", 8 = "RainViewer Universal
 // Blue"); the stored RainViewer palette id maps to the closest Rainbow one (RV2RBK below).
-// config keys: lat, lon, zoom (3-12, default 7), color (palette id), label, pause (1 = freeze
+// config keys: lat, lon, zoom (3-13, default 7), color (palette id), label, pause (1 = freeze
 // frame), ctl (1 = +/- zoom buttons + two-finger pinch on the map; zoom persists per label in
-// localStorage). Zoom ceiling ws7ak: Rainbow's nowcast grid is native to z10 (live-probed: real
-// structure at z8/z9/z10 over a wet z7 cell, z11/12 blank) so rbk frames render to z10 and only
-// upscale beyond; RainViewer's public tilecache still caps at z7.
+// localStorage). Zoom ceiling ws7al: max rvZoom is 13 (ws7ak took it 11 -> 12; Rainbow's nowcast
+// grid is native to z10 — live-probed: real structure at z8/z9/z10 over a wet z7 cell, z11/12
+// blank — so rbk frames render to z10 and only upscale beyond; RainViewer's tilecache still caps
+// at z7). 13 is the last useful level: the OSM base keeps real detail while the rain overlay
+// upscales 8x from real z10 tiles.
 function rwRV(props) {
   const a = (props && props.config) || {};
   const lat = isFinite(Number(a.lat)) ? Number(a.lat) : 28.817422;
   const lon = isFinite(Number(a.lon)) ? Number(a.lon) : -81.620514;
-  const NZ = Math.min(Math.max(Math.round(Number(a.zoom)) || 7, 3), 12);
+  const NZ = Math.min(Math.max(Math.round(Number(a.zoom)) || 7, 3), 13);
   // color semantics (ws7aj): config.rainbowP = 1 => a.color is ALREADY a Rainbow palette id
   // (blocks edited after the fork); otherwise a.color is a legacy RainViewer id mapped through
   // RV2RBK (the wall's stored 6 = RV "Dark Sky" -> Rainbow 8 "Universal Blue").
@@ -37,9 +39,9 @@ function rwRV(props) {
   const PAUSE = (a.pause === true || Number(a.pause) === 1);
   const CTL = (a.ctl === true || Number(a.ctl) === 1);
   let rvZ0 = NZ;
-  if (CTL) { try { const lz = Math.round(Number(localStorage.getItem('rwRVz:' + rvLabel))); if (lz >= 3 && lz <= 12) rvZ0 = lz; } catch (e) {} }
+  if (CTL) { try { const lz = Math.round(Number(localStorage.getItem('rwRVz:' + rvLabel))); if (lz >= 3 && lz <= 13) rvZ0 = lz; } catch (e) {} }
   const rvZ = b.useState(rvZ0); const rvZoom = rvZ[0];
-  const rvSet = function (z) { z = Math.min(Math.max(Math.round(Number(z)), 3), 12); if (CTL) { try { localStorage.setItem('rwRVz:' + rvLabel, String(z)); } catch (e) {} } rvZ[1](z); };
+  const rvSet = function (z) { z = Math.min(Math.max(Math.round(Number(z)), 3), 13); if (CTL) { try { localStorage.setItem('rwRVz:' + rvLabel, String(z)); } catch (e) {} } rvZ[1](z); };
   const rvPinch = b.useRef(null);
   const pvStart = function (e) { if (!CTL || !e.touches || e.touches.length !== 2) return; const dx = e.touches[0].clientX - e.touches[1].clientX, dy = e.touches[0].clientY - e.touches[1].clientY; rvPinch.current = Math.sqrt(dx * dx + dy * dy); };
   const pvMove = function (e) { if (!CTL || rvPinch.current == null || !e.touches || e.touches.length !== 2) return; const dx = e.touches[0].clientX - e.touches[1].clientX, dy = e.touches[0].clientY - e.touches[1].clientY; const d = Math.sqrt(dx * dx + dy * dy); const r = d / rvPinch.current; if (r > 1.35) { rvSet(rvZoom + 1); rvPinch.current = d; } else if (r < 0.74) { rvSet(rvZoom - 1); rvPinch.current = d; } };

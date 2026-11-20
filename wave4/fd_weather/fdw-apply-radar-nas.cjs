@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// FD radar-widgets patcher NAS variant rbT30 (?v=ws7ak). Runs inside the family-dashboard container:
+// FD radar-widgets patcher NAS variant rbT30 (?v=ws7al). Runs inside the family-dashboard container:
 //   docker exec family-dashboard node /tmp/fdw-apply-radar-nas.cjs
 // Same injections as fdw-apply-radar-widgets.cjs but WITHOUT the wxGUI-marker dependency (the NAS
 // bundle has no wxgui/ws kit): the two radar comps inject right before \nfunction wsWS behind the
@@ -7,7 +7,7 @@
 // Backups: orig7.* (bundle + index.html, taken before any change). Rollback: cp orig7.<name> <name>.
 const fs = require('fs');
 const path = require('path');
-const jsVer = 'ws7ak';
+const jsVer = 'ws7al';
 const report = { steps: [], ok: true };
 const step = (name, status, extra) => { report.steps.push({ name, status, extra }); console.log('[' + status + '] ' + name + (extra ? ' :: ' + extra : '')); if (status === 'FAIL') report.ok = false; };
 const dist = process.env.FDW_DIST || '/app/client/dist';
@@ -82,7 +82,7 @@ const rvForm = 'x.type==="radar_rainviewer"&&n.jsxs("div",{className:"flex flex-
   'n.jsxs("div",{children:[n.jsx("label",{className:"text-[7.5px] text-slate-400 block mb-0.5",children:"Longitude"}),n.jsx("input",{type:"text",placeholder:"-81.644",value:(x.config||{}).lon||"",onChange:L=>p(h,{lon:L.target.value}),className:"w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1"})]})' +
   ']}),' +
   'n.jsxs("div",{className:"grid grid-cols-2 gap-1",children:[' +
-  'n.jsxs("div",{children:[n.jsx("label",{className:"text-[7.5px] text-slate-400 block mb-0.5",children:"Zoom (3-12, default 7)"}),n.jsx("input",{type:"text",placeholder:"7",value:(x.config||{}).zoom||"",onChange:L=>p(h,{zoom:L.target.value}),className:"w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1"})]}),' +
+  'n.jsxs("div",{children:[n.jsx("label",{className:"text-[7.5px] text-slate-400 block mb-0.5",children:"Zoom (3-13, default 7)"}),n.jsx("input",{type:"text",placeholder:"7",value:(x.config||{}).zoom||"",onChange:L=>p(h,{zoom:L.target.value}),className:"w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1"})]}),' +
   'n.jsxs("div",{children:[n.jsx("label",{className:"text-[7.5px] text-slate-400 block mb-0.5",children:"Palette"}),n.jsx("select",{value:(x.config||{}).color??6,onChange:L=>p(h,{color:Number(L.target.value)}),className:"w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1",children:[n.jsx("option",{value:6,children:"Dark Sky"}),n.jsx("option",{value:8,children:"Dark Sky Alt"}),n.jsx("option",{value:4,children:"Rainbow"}),n.jsx("option",{value:2,children:"Universal Blue"}),n.jsx("option",{value:0,children:"Classic"}),n.jsx("option",{value:3,children:"Titan"})]})]})' +
   ']}),' +
   'n.jsx("input",{type:"text",placeholder:"Label (optional)",value:(x.config||{}).label||"",onChange:L=>p(h,{label:L.target.value}),className:"w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1"})' +
@@ -90,15 +90,19 @@ const rvForm = 'x.type==="radar_rainviewer"&&n.jsxs("div",{className:"flex flex-
 one('form.inject', 'x.type==="radar_windy"&&',
   'x.type==="radar_block"&&n.jsxs("div",{className:"flex flex-col gap-1.5 border-t border-slate-800 pt-1.5"',
   windyForm + rvForm + 'x.type==="radar_block"&&n.jsxs("div",{className:"flex flex-col gap-1.5 border-t border-slate-800 pt-1.5"');
-// ws7aj — upgrade pass for previous-wave deployed bundles: the deployed form block came from the
-// previous wave, so replace its piece-parts (title, palette selector, admin label) in place;
+// upgrade pass for previously-deployed bundles: the deployed form block came from an earlier
+// wave, so replace its piece-parts (title, palette selector, admin label) in place;
 // reruns SKIP on the new markers. Fresh bundles get the old form injected then upgraded.
 one('rainbow.formTitle', 'children:"Rainbow Radar Config"', 'children:"RainViewer Radar Config"', 'children:"Rainbow Radar Config"');
 one('rainbow.palette', 'rainbowP:1', '(x.config||{}).color??6,onChange:L=>p(h,{color:Number(L.target.value)})', '(x.config||{}).color??8,onChange:L=>p(h,{color:Number(L.target.value),rainbowP:1})');
 one('rainbow.opts', 'value:4,children:"Nexrad"', 'children:[n.jsx("option",{value:6,children:"Dark Sky"}),n.jsx("option",{value:8,children:"Dark Sky Alt"}),n.jsx("option",{value:4,children:"Rainbow"}),n.jsx("option",{value:2,children:"Universal Blue"}),n.jsx("option",{value:0,children:"Classic"}),n.jsx("option",{value:3,children:"Titan"})]', 'children:[n.jsx("option",{value:8,children:"Universal Blue"}),n.jsx("option",{value:4,children:"Nexrad"}),n.jsx("option",{value:5,children:"Rainviewer"}),n.jsx("option",{value:0,children:"Semi-Classic"}),n.jsx("option",{value:1,children:"Original"}),n.jsx("option",{value:2,children:"Rainbow SELEX"}),n.jsx("option",{value:3,children:"Titan"}),n.jsx("option",{value:6,children:"Palette 6"}),n.jsx("option",{value:7,children:"Palette 7"}),n.jsx("option",{value:9,children:"Palette 9"})]');
 one('rainbow.label', 'return"Radar: Rainbow"', 'case"radar_rainviewer":return"Radar: RainViewer"', 'case"radar_rainviewer":return"Radar: Rainbow"');
-// ws7ak deep-zoom pass: comp region rewritten from the shipped comp; form label bump in place.
-one('zoom.label', 'Zoom (3-12', 'children:"Zoom (3-11, default 7)"', 'children:"Zoom (3-12, default 7)"');
+// ws7al zoom-ceiling pass: same 3-branch label bump as the Pi patcher (fresh or bare 3-12
+// variant; both collapse to `Zoom (3-13, default 7)`; reruns SKIP on either 3-13 marker).
+if (js.indexOf('Zoom (3-13') >= 0) step('zoom.label', 'SKIP', 'already 3-13');
+else if (js.split('children:"Zoom (3-12, default 7)"').length === 2) { js = js.replace('children:"Zoom (3-12, default 7)"', 'children:"Zoom (3-13, default 7)"'); step('zoom.label', 'OK', 'fresh 3-12 -> 3-13'); }
+else if (js.split('children:"Zoom (3-12)"').length === 2) { js = js.replace('children:"Zoom (3-12)"', 'children:"Zoom (3-13, default 7)"'); step('zoom.label', 'OK', 'bare 3-12 -> 3-13, default 7'); }
+else { step('zoom.label', 'FAIL', 'no known zoom label variant (want Zoom (3-12...))'); }
 // ---- cache bust + guards + parse + write ----
 const vi = html.indexOf(mjs[1] + '?v=');
 if (vi >= 0) { if (ver !== jsVer) html = html.replace(mjs[1] + '?v=' + ver, mjs[1] + '?v=' + jsVer); step('cache.bust', 'OK', '?v=' + (ver || 'none') + ' -> ?v=' + jsVer); }
