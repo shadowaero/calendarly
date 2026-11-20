@@ -30,6 +30,7 @@ console.log("rwInWxCard: " + (function(){var S=js.slice(js.indexOf("function wxG
 console.log("wxSrc: " + (function(){var S=js.slice(js.indexOf("function wxGUI"), js.indexOf("function wsWS({")); return S.includes("OPEN-METEO");})());
 console.log("omSm: " + (function(){var S=js.slice(js.indexOf("function wxGUI"), js.indexOf("function wsWS({")); return (S.includes(".49cqw") && S.includes("OPEN-METEO")) ? 1 : 0;})());
 console.log("omHalf: " + (function(){var S=js.slice(js.indexOf("function wxGUI"), js.indexOf("function wsWS({")); return S.includes(".075cqh") ? 1 : 0;})());
+console.log("omNudge: " + (function(){var S=js.slice(js.indexOf("function wxGUI"), js.indexOf("function wsWS({")); return S.includes("translate(5px, 5px)") ? 1 : 0;})());
 console.log("wxAnim: " + (function(){var S=js.slice(js.indexOf("function wxGUI"), js.indexOf("function wsWS({")); return (S.includes("wgXBob") && S.includes("wgXBreath") && S.includes("wgIcoBob") && js.includes("@keyframes wgXBob") && js.includes("@keyframes wgIcoBob")) ? 1 : 0;})());
 console.log("n12Gone: " + (function(){var S=js.slice(js.indexOf("function wxGUI"), js.indexOf("function wsWS({")); return !S.includes("NEXT 12H") ? 1 : 0;})());
 console.log("fx5: " + (function(){var S=js.slice(js.indexOf("function wxGUI"), js.indexOf("function wsWS({")); return (S.includes("5-DAY FORECAST") && S.includes("&days=6") && !S.includes("&days=2") && S.includes("TODAY")) ? 1 : 0;})());

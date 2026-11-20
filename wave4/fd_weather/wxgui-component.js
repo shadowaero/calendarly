@@ -1,6 +1,6 @@
 // wxGUI — full-screen "Weather GUI" block, replicating out/weathergui.jpg (v1 duplicate build)
 // ws7af — adds the 5-day hi/lo forecast strip to the hero mid-spacer (weather fetch now days=6; strip hidden when the daily feed is empty)
-// ws7an — sun-arc right column: the +12h moon label is removed; the meteo-source credit is shrunk 35% and pinned into the bottom-right corner (the phase moon icon stays, now unlabeled); ws7ao — the credit now sits half the gap from the bottom edge (corner padding halved); ws7ap — living-weather pass: scene clouds gain a slow bob + opacity breath on top of the drift, and the wxIco icons (condition pill, 5-day strip, meteo credit) float gently — same art, now visibly in motion (the 12-hour strip stays intentionally muted; sizes still deliberately absent).
+// ws7an — sun-arc right column: the +12h moon label is removed; the meteo-source credit is shrunk 35% and pinned into the bottom-right corner (the phase moon icon stays, now unlabeled); ws7ao — the credit now sits half the gap from the bottom edge (corner padding halved); ws7ap — living-weather pass: scene clouds gain a slow bob + opacity breath on top of the drift, and the wxIco icons (condition pill, 5-day strip, meteo credit) float gently — same art, now visibly in motion (the 12-hour strip stays intentionally muted; sizes still deliberately absent); ws7aq — the meteo credit unit nudged 5px right + 5px down (layout-free transform on the credit column; the moon's float rides along).
 // Injected into the client bundle right before `function wsWS` — module scope here already has:
 // n (jsx), b (react), WX_SVG, wxIco, wxIconKey, wmoBucket, fOf, inHg, fmt12, fmtHour, minsOf, DIRS,
 // rwRV (RainViewer animated radar block — injected by fdw-apply-radar-widgets.cjs before this comp)
@@ -406,7 +406,7 @@ function wxGUI(props) {
           ] })
         ] })
       ] }),
-      n.jsxs('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.3cqh', flexShrink: 0, paddingBottom: '.075cqh', whiteSpace: 'nowrap' }, children: [
+      n.jsxs('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.3cqh', flexShrink: 0, paddingBottom: '.075cqh', whiteSpace: 'nowrap', transform: 'translate(5px, 5px)' }, children: [
         wxIco(isDay ? 'partly-cloudy-night' : 'clear-night', '2.2cqh', { height: '2.2cqh', filter: 'brightness(1.4)', animation: 'wgIcoBob 6.4s ease-in-out infinite alternate' }),
         n.jsx('div', { style: { fontSize: '.49cqw', fontWeight: 700, color: '#eef3fa', whiteSpace: 'nowrap', letterSpacing: '-.02em' }, children: 'OPEN-METEO' })
       ] })
