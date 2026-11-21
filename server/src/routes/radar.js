@@ -51,8 +51,10 @@ function rbkUsageNow() {
     if (fs.existsSync(USAGE_PATH)) {
       const j = JSON.parse(fs.readFileSync(USAGE_PATH, 'utf8'));
       if (j.ym === ym) { rbkUsage = { ym: ym, days: j.days || {}, k1: j.k1 || 0, k2: j.k2 || 0, total: j.total || 0 }; }
+      else { rbkUsage = { ym: ym, days: {}, k1: 0, k2: 0, total: 0 }; } // ws7as: the meter zeroes at the year-month rollover (Nov's carry no longer leaks into Dec)
     }
   } catch (e) {}
+  rbkUsage.day = day; // ws7as: real per-day histogram key (rbkBump reads rbkUsage.day — was the undefined-key bug)
   rbkUsage.ym = ym;
   const today = (rbkUsage.days && rbkUsage.days[day]) || 0;
   return { ym: ym, day: day, today: today, k1: rbkUsage.k1, k2: rbkUsage.k2, total: rbkUsage.total, left: MONTH_CAP - rbkUsage.total };
