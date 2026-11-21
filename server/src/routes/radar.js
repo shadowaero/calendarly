@@ -1,9 +1,10 @@
-// radar.js — Rainbow Weather (api.rainbow.ai) server-side tile proxy (token ws7aj).
+// radar.js — Rainbow Weather (api.rainbow.ai) server-side tile proxy (token ws7aj; ws7at quota space).
 // Injects the subscription key server-side (Rainbow's docs refuse browser keys; the kiosk HTML is
 // public), disk-caches response tiles, rotates primary/secondary keys round-robin with per-key
-// cooldown, counts upstream calls to data/rainbow-usage.json, and circuit-breaks on quota errors
-// (503 {fallback:true}) — the rwRV deck watches /radar/api/health and auto-plays the untouched
-// RainViewer path while the breaker is open. Rollback: git revert token ws7aj.
+// cooldown, counts upstream attempts to data/rainbow-usage.json (ws7at: usage.left is scaled into
+// Rainbow's own quota units over the 20th->19th billing window — see the consts below), and
+// circuit-breaks on quota errors (503 {fallback:true}) — the rwRV deck watches /radar/api/health
+// and auto-plays the untouched RainViewer path while the breaker is open. Rollback: git revert.
 import express from 'express';
 import https from 'https';
 import fs from 'fs';
@@ -16,7 +17,19 @@ const KEYS_PATH = process.env.RAINBOW_KEYS || path.join(DATA_DIR, '.rainbow-api-
 const TILE_DIR = path.join(DATA_DIR, 'rainbow-tiles');
 const USAGE_PATH = path.join(DATA_DIR, 'rainbow-usage.json');
 const UPSTREAM_HOST = 'api.rainbow.ai';
-const MONTH_CAP = Number(process.env.RAINBOW_MONTH_CAP || 9300); // free tier 10K/mo — brake before it
+// ws7at: Rainbow's free tier = 10,000 calls per billing window (the 20th -> the 19th UTC; their
+// dashboard 2026-11-21: "8,307 used · 1,693 left of 10,000 · resets on December 20, 2026").
+// VERIFIED 1:1 live reconciliation: their raw ledger (8,715 requests) == our lifetime attempt
+// meter (8,619, within ~1% — skew: NAS's ~5 attempts + probe calls + a few minutes' clock skew),
+// so left = QUOTA_CAP - attempts * UPC with UPC = 1 — "On Free, each call counts as 1" (their
+// pricing page; paid tiers bill Tiles=2 -> set RAINBOW_UPC=2 then). The client ladder thresholds
+// (7800/7000) read the same usage.left and keep their original ws7ar economics (fresh 10,000 ->
+// tier 2; brake at 700). "Plan state (internal)" is NOT customer-callable (12 probed paths 404;
+// no RateLimit/quota headers on 200s) — the attempt meter IS the truth. Recalibrate UPC only if
+// their billing semantics change (set RAINBOW_UPC=2 on a paid plan).
+const QUOTA_CAP = Number(process.env.RAINBOW_QUOTA_CAP || 10000);
+const UPC = Number(process.env.RAINBOW_UPC || 1);       // Rainbow billed units per upstream attempt (Free = 1)
+const BRAKE = Number(process.env.RAINBOW_BRAKE || 700); // breaker opens while left <= BRAKE (drift margin before their hard pause)
 const COOL_MS = 5 * 60000;   // per-key cooldown after 429/402
 const BAD_MS = 60 * 60000;   // per-key cooldown after 401/403 (key invalid)
 const FUT_TTL = 2 * 3600000; // future/edge frames: match their CDN max-age=7200
@@ -45,19 +58,22 @@ function rbkReadKeys() {
 let rbkUsage = { ym: '', k1: 0, k2: 0, total: 0 };
 function rbkUsageNow() {
   const d = new Date(Date.now() - 0);
-  const ym = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = ym + '-' + String(d.getUTCDate()).padStart(2, '0');
+  // ws7at: key the meter to Rainbow's BILLING window (the 20th -> the 19th UTC), not the calendar
+  // month — a calendar Dec 1 zero would fake a fresh 10K while their real quota carries to Dec 20.
+  const bm = new Date(d.getTime() - (d.getUTCDate() < 20 ? 21 * 86400000 : 0));
+  const ym = bm.getUTCFullYear() + '-' + String(bm.getUTCMonth() + 1).padStart(2, '0');
+  const day = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
   try {
     if (fs.existsSync(USAGE_PATH)) {
       const j = JSON.parse(fs.readFileSync(USAGE_PATH, 'utf8'));
       if (j.ym === ym) { rbkUsage = { ym: ym, days: j.days || {}, k1: j.k1 || 0, k2: j.k2 || 0, total: j.total || 0 }; }
-      else { rbkUsage = { ym: ym, days: {}, k1: 0, k2: 0, total: 0 }; } // ws7as: the meter zeroes at the year-month rollover (Nov's carry no longer leaks into Dec)
+      else { rbkUsage = { ym: ym, days: {}, k1: 0, k2: 0, total: 0 }; } // ws7as/ws7at: the meter zeroes at the billing-window rollover (a stale carry no longer leaks across windows)
     }
   } catch (e) {}
   rbkUsage.day = day; // ws7as: real per-day histogram key (rbkBump reads rbkUsage.day — was the undefined-key bug)
   rbkUsage.ym = ym;
   const today = (rbkUsage.days && rbkUsage.days[day]) || 0;
-  return { ym: ym, day: day, today: today, k1: rbkUsage.k1, k2: rbkUsage.k2, total: rbkUsage.total, left: MONTH_CAP - rbkUsage.total };
+  return { ym: ym, day: day, today: today, k1: rbkUsage.k1, k2: rbkUsage.k2, total: rbkUsage.total, left: Math.round(QUOTA_CAP - rbkUsage.total * UPC) };
 }
 function rbkBump(idx) {
   rbkUsageNow();
@@ -71,7 +87,7 @@ let rbkRR = 0; // round-robin cursor for even key spread
 function rbkBreaker() {
   rbkReadKeys();
   rbkUsageNow();
-  if (rbkUsage.total >= MONTH_CAP) return { open: true, why: 'month-cap' };
+  if (QUOTA_CAP - rbkUsage.total * UPC <= BRAKE) return { open: true, why: 'quota-floor' };
   return { open: false };
 }
 // per-IP rate limit: 240 tile GETs per min per IP (prefetch bursts ~ 8 tiles x 10 frames)
