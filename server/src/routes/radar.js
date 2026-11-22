@@ -1,4 +1,4 @@
-// radar.js — Rainbow Weather (api.rainbow.ai) server-side tile proxy (token ws7aj; ws7at quota space; ws7au mint throttle).
+// radar.js — Rainbow Weather (api.rainbow.ai) server-side tile proxy (token ws7aj; ws7at quota space; ws7au mint throttle; ws7av standby switch).
 // Injects the subscription key server-side (Rainbow's docs refuse browser keys; the kiosk HTML is
 // public), disk-caches response tiles, rotates primary/secondary keys round-robin with per-key
 // cooldown, counts upstream attempts to data/rainbow-usage.json (ws7at: usage.left is scaled into
@@ -50,6 +50,19 @@ const MINT_EVERY_MS = Number(process.env.RAINBOW_MINT_EVERY || 2400000);
 const MINT_DAY_CAP = Number(process.env.RAINBOW_DAY_MINT_CAP || 60); // max edge families/day (cadence binds first)
 const SNAP_TTL_MS = Number(process.env.RAINBOW_SNAP_TTL || 2400000); // snapshot probe re-poll: ~1 per mint cycle (billed 1:1 too)
 const MINT_PATH = path.join(DATA_DIR, 'rainbow-mint.json');          // { t, snap, day, n }
+// ws7av: standby switch for the BACKUP host — deployment topology: the Pi 4 is the ONLY Rainbow
+// caller; the NAS container runs standby (its deck plays the untouched RainViewer path via the
+// established 503-fallback trigger, so zero client changes). Both upstream paths block hot (the
+// flag is read per request): the snapshot route 503s {fallback:true, why:'standby'} and a TILE
+// cache miss 503s BEFORE the mint gate (no mints, no fetches; the disk-cache hits above still
+// serve free), so the backup's own meter stays frozen at its pre-standby total. Flip = touch/rm
+// the marker, no restart:
+//   takeover:   docker exec family-dashboard sh -c 'rm -f "$DATA_DIR/rainbow-standby"'
+//   stand-down: re-create the file (both apply on the next snapshot poll).
+// RAINBOW_STANDBY=1 forces it at boot (compose-style). The Pi carries NEITHER -> byte-identical
+// ws7au primary behavior (the gates assert the false path + absence of the flag in /health).
+const STANDBY_FILE = path.join(DATA_DIR, 'rainbow-standby');
+function rbkStandby() { if (process.env.RAINBOW_STANDBY === '1') return true; try { return fs.existsSync(STANDBY_FILE); } catch (e) { return false; } }
 try { fs.mkdirSync(TILE_DIR, { recursive: true }); } catch (e) {}
 
 // keys file: RAINBOW_API_KEY=... / RAINBOW_API_KEY_2=... — re-read on mtime change (live rotation)
@@ -171,7 +184,7 @@ radarRouter.get('/health', function (req, res) {
   rbkSweep();
   const mnt = rbkMintLedger();
   res.set('Cache-Control', 'no-store');
-  res.json({ rbk: !b.open && rbkKeys.list.length > 0, keys: rbkKeys.list.length, why: b.open ? b.why : 'ok', usage: rbkUsageNow(), mint: { ago: Math.max(0, Date.now() - mnt.t), snap: mnt.snap, n: mnt.n, every: MINT_EVERY_MS, ttl: SNAP_TTL_MS } });
+  res.json({ rbk: !b.open && rbkKeys.list.length > 0, keys: rbkKeys.list.length, why: b.open ? b.why : 'ok', standby: rbkStandby() ? 1 : undefined, usage: rbkUsageNow(), mint: { ago: Math.max(0, Date.now() - mnt.t), snap: mnt.snap, n: mnt.n, every: MINT_EVERY_MS, ttl: SNAP_TTL_MS } }); // ws7av: the flag field appears only while standby (undefined drops from the JSON when primary)
 });
 function rbkTile(req, res, layer, offNum) {
   const ip = String(req.ip || 'x').replace(/[^A-Za-z0-9:.]/g, '').slice(0, 40);
@@ -194,6 +207,8 @@ function rbkTile(req, res, layer, offNum) {
     res.set('Content-Type', 'image/png');
     return res.sendFile(file);
   }
+  // ws7av: the BACKUP never mints or fetches — a cache miss 503s into the deck's RainViewer trigger; hits above still serve free
+  if (rbkStandby()) return res.status(503).set('Retry-After', '300').json({ fallback: true, why: 'standby' });
   // ws7au: mint throttle — a cache miss holds to the last minted edge tile unless the gate mints
   const rbkHold = rbkMintGate(layer, snap, off, z, x, y, col, rbkSnap.v || nowSnap);
   if (rbkHold) {
@@ -239,6 +254,7 @@ function rbkTile(req, res, layer, offNum) {
 // router serves it: 1 upstream call only on a 2-min cache miss; last-good survives outages.
 let rbkSnap = { v: null, t: 0 };
 function rbkSnapshotRoute(req, res) {
+  if (rbkStandby()) return res.status(503).json({ fallback: true, why: 'standby' }); // ws7av: standby never probes upstream — the deck's fallback trigger serves RainViewer
   const now = Date.now();
   if (rbkSnap.v && (now - rbkSnap.t) < SNAP_TTL_MS) return res.json({ snapshot: rbkSnap.v, cached: true }); // ws7au: the snapshot probe bills 1:1 too — re-polls at the mint cadence (~36/day)
   const br = rbkBreaker();
