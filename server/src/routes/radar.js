@@ -1,4 +1,4 @@
-// radar.js — Rainbow Weather (api.rainbow.ai) server-side tile proxy (token ws7aj; ws7at quota space).
+// radar.js — Rainbow Weather (api.rainbow.ai) server-side tile proxy (token ws7aj; ws7at quota space; ws7au mint throttle).
 // Injects the subscription key server-side (Rainbow's docs refuse browser keys; the kiosk HTML is
 // public), disk-caches response tiles, rotates primary/secondary keys round-robin with per-key
 // cooldown, counts upstream attempts to data/rainbow-usage.json (ws7at: usage.left is scaled into
@@ -33,6 +33,23 @@ const BRAKE = Number(process.env.RAINBOW_BRAKE || 700); // breaker opens while l
 const COOL_MS = 5 * 60000;   // per-key cooldown after 429/402
 const BAD_MS = 60 * 60000;   // per-key cooldown after 401/403 (key invalid)
 const FUT_TTL = 2 * 3600000; // future/edge frames: match their CDN max-age=7200
+// ws7au: free-tier sustainment — Rainbow bills 1:1 for tile fetches AND the snapshot probe (their
+// ledger == our attempt meter within ~1%), and the ws7at window burned out in ~36 h at the
+// mint-on-demand rate (~42 calls per 10-min publish roll — each new publish's (snap, off) family
+// is fresh: 7 frames x 6 tiles). Now the proxy MINTS at most one edge frame family per
+// RAINBOW_MINT_EVERY (default 40 min) and every other cache miss — future offsets, stale past
+// slots, within-cadence edges — HOLDS to the last minted edge tile (same z/x/y: the deck's
+// viewport is fixed, so the file exists). Steady burn at the 40-min cadence: ~36 edge families/day
+// (=216 tiles) + ~36 snapshot re-polls (the snapshot id feeds the deck's stamps, so it re-polls at
+// the mint cadence too) ~= 252 calls/day ~ 7,560 per 30-day window, comfortably under the brake
+// floor (left 700 == total 9,300) — the newest radar runs ~40-90 min old and the HUD stamps trail
+// wall clock by up to ~50 min; that is the price of a full month on Rainbow without paying (the
+// ws7at option text undercounted the billed snapshot probes). The 503 RainViewer breaker stays the
+// backstop. Set RAINBOW_MINT_EVERY=0 to restore mint-on-demand (parity probing).
+const MINT_EVERY_MS = Number(process.env.RAINBOW_MINT_EVERY || 2400000);
+const MINT_DAY_CAP = Number(process.env.RAINBOW_DAY_MINT_CAP || 60); // max edge families/day (cadence binds first)
+const SNAP_TTL_MS = Number(process.env.RAINBOW_SNAP_TTL || 2400000); // snapshot probe re-poll: ~1 per mint cycle (billed 1:1 too)
+const MINT_PATH = path.join(DATA_DIR, 'rainbow-mint.json');          // { t, snap, day, n }
 try { fs.mkdirSync(TILE_DIR, { recursive: true }); } catch (e) {}
 
 // keys file: RAINBOW_API_KEY=... / RAINBOW_API_KEY_2=... — re-read on mtime change (live rotation)
@@ -90,6 +107,37 @@ function rbkBreaker() {
   if (QUOTA_CAP - rbkUsage.total * UPC <= BRAKE) return { open: true, why: 'quota-floor' };
   return { open: false };
 }
+// ws7au: persisted mint ledger + per-request mint gate. Only the LIVE edge family (off === 0,
+// |snap - liveRef| <= 60 where liveRef is the newest known publish id and the client builds its
+// slots from it, so the live slot's distance is 0) may mint, at most one family per MINT_EVERY_MS
+// and MINT_DAY_CAP per UTC day; every other cache miss HOLDS to the last minted edge tile.
+// Returns the hold file path, or null to mint (cold start / viewport changes pass through the
+// early null-return — bounded, since each mint refreshes the ledger and subsequent misses find
+// their hold file).
+let rbkMint = null;
+function rbkMintLedger() {
+  if (rbkMint) return rbkMint;
+  let fresh = true;
+  try { const j = JSON.parse(fs.readFileSync(MINT_PATH, 'utf8')); if (j && typeof j.t === 'number') { rbkMint = j; fresh = false; } } catch (e) {}
+  if (!rbkMint) rbkMint = { t: 0, snap: 0, day: '', n: 0 };
+  if (fresh) rbkMintSave(); // ws7au: seed the ledger file on first boot (restart continuity + observability while braked)
+  return rbkMint;
+}
+function rbkMintSave() { try { fs.writeFileSync(MINT_PATH + '.tmp', JSON.stringify(rbkMintLedger())); fs.renameSync(MINT_PATH + '.tmp', MINT_PATH); } catch (e) {} }
+function rbkMintGate(layer, snap, off, z, x, y, col, liveRef) {
+  const m = rbkMintLedger();
+  const d = new Date();
+  const mday = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0'); // ws7au: named mday — rbkUsageNow owns the `const day` shape the ws7at gate pins
+  if (m.day !== mday) { m.day = mday; m.n = 0; rbkMintSave(); }
+  const holdFile = m.snap ? path.join(TILE_DIR, layer + '_' + m.snap + '_0_' + z + '_' + x + '_' + y + '_' + col + '.png') : '';
+  if (!holdFile || !fs.existsSync(holdFile)) return null; // nothing to hold -> complete/mint
+  if (off > 0) return holdFile;                        // future nowcasts always hold
+  if (Math.abs(snap - liveRef) > 60) return holdFile; // stale past slots always hold — liveRef is the newest known publish id and the client builds its slots FROM it, so the live slot's distance is 0 (±60 s slack; NOT wall clock, which would misread a 40-min-stale snapshot feed as ~3000s stale)
+  if (m.n >= MINT_DAY_CAP) return holdFile;            // runaway guard (cadence binds first)
+  if (Date.now() - m.t < MINT_EVERY_MS) return holdFile; // the 30-min cadence
+  m.t = Date.now(); m.n += 1; m.snap = snap; rbkMintSave(); // claim the cycle optimistically (dedupes concurrent fires)
+  return null; // mint the live edge
+}
 // per-IP rate limit: 240 tile GETs per min per IP (prefetch bursts ~ 8 tiles x 10 frames)
 const rbkIPs = new Map();
 function rbkLimit(ip) {
@@ -121,8 +169,9 @@ function rbkSweep() {
 radarRouter.get('/health', function (req, res) {
   const b = rbkBreaker();
   rbkSweep();
+  const mnt = rbkMintLedger();
   res.set('Cache-Control', 'no-store');
-  res.json({ rbk: !b.open && rbkKeys.list.length > 0, keys: rbkKeys.list.length, why: b.open ? b.why : 'ok', usage: rbkUsageNow() });
+  res.json({ rbk: !b.open && rbkKeys.list.length > 0, keys: rbkKeys.list.length, why: b.open ? b.why : 'ok', usage: rbkUsageNow(), mint: { ago: Math.max(0, Date.now() - mnt.t), snap: mnt.snap, n: mnt.n, every: MINT_EVERY_MS, ttl: SNAP_TTL_MS } });
 });
 function rbkTile(req, res, layer, offNum) {
   const ip = String(req.ip || 'x').replace(/[^A-Za-z0-9:.]/g, '').slice(0, 40);
@@ -145,6 +194,14 @@ function rbkTile(req, res, layer, offNum) {
     res.set('Content-Type', 'image/png');
     return res.sendFile(file);
   }
+  // ws7au: mint throttle — a cache miss holds to the last minted edge tile unless the gate mints
+  const rbkHold = rbkMintGate(layer, snap, off, z, x, y, col, rbkSnap.v || nowSnap);
+  if (rbkHold) {
+    res.set('Cache-Control', 'public, max-age=1800');
+    res.set('Content-Type', 'image/png');
+    res.set('X-Rbk-Hold', '1');
+    return res.sendFile(rbkHold);
+  }
   const up = layer === 'radars'
     ? ('/tiles/v1/' + layer + '/' + snap + '/' + z + '/' + x + '/' + y + '?color=' + col)
     : ('/tiles/v1/' + layer + '/' + snap + '/' + off + '/' + z + '/' + x + '/' + y + '?color=' + col);
@@ -163,6 +220,7 @@ function rbkTile(req, res, layer, offNum) {
       if (st === 200 && buf.length > 4) {
         const tmp = file + '.w' + idx;
         try { fs.writeFileSync(tmp, buf); fs.renameSync(tmp, file); } catch (e) {}
+        if (off === 0) { const m = rbkMintLedger(); m.t = Date.now(); if (m.snap !== snap) { m.n += 1; } m.snap = snap; rbkMintSave(); } // ws7au: only true edge-family mints advance the ledger (n counts families)
         res.set('Cache-Control', (snap + off < nowSnap) ? 'public, max-age=86400, immutable' : 'public, max-age=600');
         res.set('Content-Type', 'image/png');
         return res.end(buf);
@@ -182,7 +240,7 @@ function rbkTile(req, res, layer, offNum) {
 let rbkSnap = { v: null, t: 0 };
 function rbkSnapshotRoute(req, res) {
   const now = Date.now();
-  if (rbkSnap.v && (now - rbkSnap.t) < 120000) return res.json({ snapshot: rbkSnap.v, cached: true });
+  if (rbkSnap.v && (now - rbkSnap.t) < SNAP_TTL_MS) return res.json({ snapshot: rbkSnap.v, cached: true }); // ws7au: the snapshot probe bills 1:1 too — re-polls at the mint cadence (~36/day)
   const br = rbkBreaker();
   if (br.open || !rbkKeys.list.length) { if (rbkSnap.v) return res.json({ snapshot: rbkSnap.v, cached: true, stale: true }); return res.status(503).json({ fallback: true, why: br.open ? br.why : 'no-keys' }); }
   const ks = rbkKeys.list;
