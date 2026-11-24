@@ -2,6 +2,7 @@
 # restored from the old GitHub history) + the FDW kiosk kit (wave4/fd_weather) + repo docs.
 /*
 !/SSH-ACCESS.md
+!/ZIGBEE-ZBDONGLE-SETUP.md
 !/.gitignore
 !/README.md
 !/Dockerfile
@@ -24,3 +25,15 @@ tmp/*
 # build snapshots that should not be tracked
 tmp/pi-bundle.js
 tmp/index.server.js
+# --- hardening (house rules from .clinerules, enforced so `git add -A` stays safe) ---
+# build output / deps / runtime data - never tracked
+client/dist/
+client/dist-readable/
+client/node_modules/
+server/node_modules/
+server/data/
+server/package-lock.json
+server/src/weather.js.preport.bak
+# NEVER commit: credentials / tokens (these override the tmp/*.cjs|mjs whitelist above)
+tmp/pi-passwd-rotate*.cjs
+tmp/ha-mint-token.mjs
