@@ -1156,3 +1156,15 @@ Three asks: fix the neon-green Chalkboard background, raise the radar zoom cap 1
   sensors for temp/humidity/power. ZHA entry present (1× in core.config_entries).
 - Verify-code lesson: `GET /api/screens/:id` returns a FLAT `{id,name,…,blocks}` object —
   a `scr.screen.id` assumption crashed a verify run mid-flight. Guard response shapes.
+- pwsh-over-ssh gotcha #3: **`$VAR` / `$?` expand inside pwsh double-quoted ssh strings**
+  (PowerShell single quotes inside such a string are literal chars, NOT quoting). A `$p`
+  fd-scan silently scanned nothing and `echo $?` printed "True" — producing a false
+  "no process holds the radio" verdict that sent diagnosis in the wrong direction. Keep
+  `$` out of inline ssh strings; use `$`-free forms (`find /proc -maxdepth 3 -lname
+  '*ttyUSB*'`, tr+grep) or the spawnSync-file pattern (argv-passed, immune to pwsh).
+- ZHA endgame (11/24): entry configured perfectly (ezsp / /dev/ttyUSB0 / 115200; EUI64
+  read off the stick = `zigbee.db` formed) BUT the radio was held by no process and init
+  logged nothing — EmberZNet 7.x NCP firmware needs **flow_control:"software"** while the
+  entry had `null`. Remediation: re-add ZHA with Software flow control (fall back to None
+  for older firmware), re-seat the dongle if needed (lsusb showed Device 009 = repeated
+  re-enumeration). Kiosk side is unaffected: tiles + service calls verified end-to-end.
