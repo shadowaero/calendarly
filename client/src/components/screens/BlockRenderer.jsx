@@ -21,6 +21,9 @@ import { PhotoFrameBlock } from './widgets/PhotoFrameBlock';
 import { DateBlock } from './widgets/DateBlock';
 import { TodayButtonBlock } from './widgets/TodayButtonBlock';
 import { CalendarLegendBlock } from './widgets/CalendarLegendBlock';
+import { HaClimateBlock } from './widgets/HaClimateBlock';
+import { HaLightBlock } from './widgets/HaLightBlock';
+import { HaSensorBlock } from './widgets/HaSensorBlock';
 import { FONT_CLASSES } from './fonts';
 import { getBlockBackgroundStyle } from './backgrounds';
 
@@ -303,6 +306,27 @@ export default function BlockRenderer({
       return (
         <div className={containerStyle} style={containerBg}>
           <CalendarLegendBlock config={config} feeds={feeds} fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'ha_climate':
+      return (
+        <div className={`${containerStyle} p-2`} style={containerBg}>
+          <HaClimateBlock config={config} clientMode={clientMode} />
+        </div>
+      );
+
+    case 'ha_light':
+      return (
+        <div className={`${containerStyle} p-2`} style={containerBg}>
+          <HaLightBlock config={config} clientMode={clientMode} />
+        </div>
+      );
+
+    case 'ha_sensor':
+      return (
+        <div className={`${containerStyle} p-2`} style={containerBg}>
+          <HaSensorBlock config={config} clientMode={clientMode} />
         </div>
       );
 

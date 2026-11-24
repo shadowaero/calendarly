@@ -11,11 +11,19 @@ export function ScreenSidebarControls({
 }) {
   const selectedBlock = screenForm.blocks[selectedBlockIdx] || null;
   const [bgPhotos, setBgPhotos] = React.useState([]);
+  const [haEntities, setHaEntities] = React.useState([]);
 
   React.useEffect(() => {
     fetch("/api/photos")
       .then((r) => (r.ok ? r.json() : []))
       .then(setBgPhotos)
+      .catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    fetch("/api/ha/entities")
+      .then((r) => (r.ok ? r.json() : { entities: [] }))
+      .then((j) => setHaEntities(j.entities || []))
       .catch(() => {});
   }, []);
 
@@ -84,6 +92,9 @@ export function ScreenSidebarControls({
       case "weather_gui": return "Weather GUI (hero dashboard)";
       case "radar_rainviewer": return "Radar: Rainbow";
       case "radar_windy": return "Radar: Windy";
+      case "ha_climate": return "HA: Thermostat";
+      case "ha_light": return "HA: Light";
+      case "ha_sensor": return "HA: Sensor";
       default: return type.replace("_", " ");
     }
   };
@@ -168,6 +179,9 @@ export function ScreenSidebarControls({
           <button type="button" onClick={() => addBlock("quote_notes")} className="px-1.5 py-1 bg-purple-950/80 hover:bg-purple-900 border border-purple-800 text-purple-200 rounded-lg text-[9px] font-bold">+ Note</button>
           <button type="button" onClick={() => addBlock("dailyfacts")} className="px-1.5 py-1 bg-orange-950/80 hover:bg-orange-900 border border-orange-800 text-orange-200 rounded-lg text-[9px] font-bold">+ Fact</button>
           <button type="button" onClick={() => addBlock("photo_embed")} className="px-1.5 py-1 bg-pink-950/80 hover:bg-pink-900 border border-pink-800 text-pink-200 rounded-lg text-[9px] font-bold">+ Photo</button>
+          <button type="button" onClick={() => addBlock("ha_climate")} className="px-1.5 py-1 bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-200 rounded-lg text-[9px] font-bold">+ Thermo</button>
+          <button type="button" onClick={() => addBlock("ha_light")} className="px-1.5 py-1 bg-amber-950/80 hover:bg-amber-900 border border-amber-800 text-amber-200 rounded-lg text-[9px] font-bold">+ Light</button>
+          <button type="button" onClick={() => addBlock("ha_sensor")} className="px-1.5 py-1 bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-800 text-emerald-200 rounded-lg text-[9px] font-bold">+ Sensor</button>
         </div>
       </div>
 
@@ -642,6 +656,58 @@ export function ScreenSidebarControls({
                     />
                   </label>
                 </div>
+              </div>
+            )}
+
+            {/* Home Assistant tile config (shared by ha_climate / ha_light / ha_sensor) */}
+            {["ha_climate", "ha_light", "ha_sensor"].indexOf(selectedBlock.type) >= 0 && (
+              <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-1.5">
+                <span className="font-bold text-rose-300 uppercase text-[8px]">Home Assistant Entity</span>
+                <div>
+                  <label className="text-[7.5px] text-slate-400 block mb-0.5">Entity</label>
+                  <select
+                    value={selectedBlock.config?.entity_id || ""}
+                    onChange={(e) => updateBlockConfig(selectedBlockIdx, { entity_id: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1"
+                  >
+                    <option value="">{haEntities.length ? "— select entity —" : "— HA entities unavailable —"}</option>
+                    {haEntities
+                      .filter((e) =>
+                        selectedBlock.type === "ha_climate"
+                          ? e.domain === "climate"
+                          : selectedBlock.type === "ha_light"
+                          ? e.domain === "light" || e.domain === "switch"
+                          : e.domain === "sensor" || e.domain === "binary_sensor"
+                      )
+                      .map((e) => (
+                        <option key={e.entity_id} value={e.entity_id}>
+                          {e.name} ({e.entity_id})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[7.5px] text-slate-400 block mb-0.5">Label (blank = entity name)</label>
+                  <input
+                    type="text"
+                    value={selectedBlock.config?.label || ""}
+                    onChange={(e) => updateBlockConfig(selectedBlockIdx, { label: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1"
+                  />
+                </div>
+                {selectedBlock.type === "ha_climate" && (
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Setpoint step</label>
+                    <input
+                      type="number"
+                      min="0.5"
+                      step="0.5"
+                      value={selectedBlock.config?.step || 1}
+                      onChange={(e) => updateBlockConfig(selectedBlockIdx, { step: Number(e.target.value) || 1 })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1"
+                    />
+                  </div>
+                )}
               </div>
             )}
 

@@ -211,6 +211,63 @@ export function initDatabase() {
   }
 
   seedDefaults();
+  seedHomeAssistantScreen();
+}
+
+// Seed the "Home Assistant" kiosk screen (ws7ay) + attach it to the kiosk loop(s).
+// Idempotent: creates once, then only ensures loop membership. Blocks are seeded
+// with empty entity_id and auto-wired by hass.js once HA is reachable.
+function seedHomeAssistantScreen() {
+  try {
+    const existing = db.prepare("SELECT id FROM screens WHERE name = 'Home Assistant' AND is_template = 0").get();
+    let sid;
+    if (existing) {
+      sid = existing.id;
+    } else {
+      const res = db.prepare(`
+        INSERT INTO screens (name, description, orientation, resolution, background_type, background_value)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(
+        'Home Assistant',
+        'Native Home Assistant tiles (thermostat / lights / sensors)',
+        'landscape',
+        '1080p',
+        'color',
+        '#090D16'
+      );
+      sid = res.lastInsertRowid;
+      const ib = db.prepare(`
+        INSERT INTO screen_blocks (screen_id, type, pos_x, pos_y, width, height, x_percent, y_percent, w_percent, h_percent, config)
+        VALUES (?, ?, 0, 0, 6, 6, ?, ?, ?, ?, ?)
+      `);
+      ib.run(sid, 'ha_climate', 2, 6, 30, 52, JSON.stringify({ entity_id: '', label: 'Thermostat', step: 1 }));
+      ib.run(sid, 'ha_light', 2, 61, 30, 17, JSON.stringify({ entity_id: '', label: 'Light 1' }));
+      ib.run(sid, 'ha_light', 2, 80, 30, 16, JSON.stringify({ entity_id: '', label: 'Light 2' }));
+      ib.run(sid, 'ha_sensor', 34, 6, 31, 44, JSON.stringify({ entity_id: '', label: 'Sensor 1' }));
+      ib.run(sid, 'ha_sensor', 67, 6, 31, 44, JSON.stringify({ entity_id: '', label: 'Sensor 2' }));
+      ib.run(sid, 'ha_sensor', 34, 53, 31, 43, JSON.stringify({ entity_id: '', label: 'Sensor 3' }));
+      ib.run(sid, 'ha_sensor', 67, 53, 31, 43, JSON.stringify({ entity_id: '', label: 'Sensor 4' }));
+      console.log('[DB] Seeded Home Assistant screen (id ' + sid + ')');
+    }
+    // Attach to the kiosk loop(s): any loop driving a display + loop 1 as fallback.
+    const targets = new Set(
+      db.prepare("SELECT assigned_id AS id FROM displays WHERE assigned_type = 'loop'").all().map((r) => r.id)
+    );
+    targets.add(1);
+    for (const lid of targets) {
+      const row = db.prepare('SELECT id, screen_ids FROM loops WHERE id = ?').get(lid);
+      if (!row) continue;
+      let ids = [];
+      try { ids = JSON.parse(row.screen_ids || '[]') || []; } catch { ids = []; }
+      if (ids.indexOf(sid) < 0) {
+        ids.push(sid);
+        db.prepare('UPDATE loops SET screen_ids = ? WHERE id = ?').run(JSON.stringify(ids), lid);
+        console.log('[DB] Appended Home Assistant screen to loop ' + lid);
+      }
+    }
+  } catch (e) {
+    console.error('seedHomeAssistantScreen error:', e.message);
+  }
 }
 
 function seedDefaults() {

@@ -1088,3 +1088,46 @@ Three asks: fix the neon-green Chalkboard background, raise the radar zoom cap 1
 - **Hands-on kiosk touch-test 2026-11-24: event edit works perfectly** (tap → edit modal → save → `EVENT_UPDATED` ws push → live grid refresh). Last open item closed — the port is verified end-to-end.
 - Source committed as **`e175572` "ws7aw: port-back wave-weather (fd_weather) …"** (16 files, +4,527/−19) and pushed to `git@github.com:shadowaero/calendarly` (main). House-rule exclusions kept out of git: `client/dist*`, `node_modules`, `server/data`, `weather.js.preport.bak`, `server/package-lock.json`, all `tmp/*` (⚠️ `tmp/pi-passwd-rotate*.cjs` carry password constants and `tmp/ha-mint-token.mjs` a token — NEVER commit; secret scan of the staged diff came back empty).
 - Same-day ops side-notes: NAS Home Assistant re-installed as the **self-managed container** (`/volume1/docker/homeassistant/`, image `2026.11.3`, host network) and all old UGOS-app HA junk purged from `/volume1/docker/`; ZBDongle-E passthrough enabled via `devices:` (by-id, double mapping) — details + runbook in `ZIGBEE-ZBDONGLE-SETUP.md` (repo root).
+
+## Native Home Assistant tiles (ws7ay) — 2026-11-24 (?v=ws7ay)
+- NEW screen "Home Assistant" with three NATIVE block types in the ws-tile instrument
+  language (fdwKit byte-untouched; new `widgets/haKit.js` mirrors the wsTile `st` styles):
+  - `ha_climate` "HA: Thermostat" — current + target temps, touch −/+/power →
+    `climate/set_temperature` + `set_hvac_mode`, hvac_action chip (heating amber / cooling sky).
+  - `ha_light` "HA: Light" — big tap-to-toggle (light.* OR switch.*), brightness bar.
+  - `ha_sensor` "HA: Sensor" — sensor/binary_sensor readout, device-class lucide icon + unit.
+  Editor: + Thermo / + Light / + Sensor add-buttons + shared "Home Assistant Entity" panel
+  with a LIVE ENTITY PICKER (domain-filtered per block type) via `GET /api/ha/entities`.
+- Server: `server/src/hass.js` (HA REST bridge — 5 s states cache; whitelisted service
+  calls: light/switch/fan toggle, climate set_temperature/set_hvac_mode, cover, with
+  entity/domain validation; LAN-open kiosk-touch policy same as event endpoints) +
+  `server/src/routes/ha.js` (`GET /api/ha/status|entities|states?ids=`,
+  `POST /api/ha/services/:domain/:service`). Config = **`server/data/ha.json`**
+  ({baseUrl, token}; GITIGNORED per house rule; env HA_BASE_URL/HA_TOKEN override).
+- DB: `seedHomeAssistantScreen()` (db.js, idempotent) creates the screen + 7 blocks
+  (1 climate, 2 lights, 4 sensors; percent geometry) and appends it to every display-driven
+  loop + loop 1. `autofillHaBlocks()` (hass.js, runs 8 s after boot) fills empty entity_id
+  slots from live HA entities (priority: climate → lights → temp/hum/power sensors);
+  never overwrites a user-picked entity.
+- Deploy: `tmp/ship-ws7ay.cjs` (base64-over-stdin both hosts; md5 14/14 identical
+  local=Pi=NAS; backups `dist.bak-ws7ay` + `index.js.bak-ws7ay`/`db.js.bak-ws7ay`;
+  silent-sudo `systemctl restart calendarly` + `restart lightdm` via pinew.txt file-stdin).
+  **LESSON (the "000" scare): Pi node boot ≈ 8 s and the NAS container ≈ 25 s — verify
+  curls must wait (sleep 8/12) after restart or they race the listener and look like a
+  crash; journal showed a clean `[DB] Seeded Home Assistant screen` + listen.**
+  Reconfirmed pwsh gotcha: `\"` does NOT escape inside pwsh double-quoted ssh strings
+  (backtick does) — complex remote commands go through a file (ship-script pattern) or
+  avoid inner double quotes entirely (tr+grep style).
+- Verified 2/2 hosts: `/api/ha/status` = {"configured":false, baseUrl:...:8123},
+  `/api/ha/states` 503 graceful, loops gained the screen (Pi id **21** → LOOP 1
+  [18,12,20,1,21] @60 s; NAS id **18** → LOOP 1 [14,12,17,2,18] @30 s), screens list
+  contains "Home Assistant", root + `/assets/index-CMtXsr1y.js?v=ws7ay` 200 both.
+- Awaiting user (two one-time steps): (1) add **ZHA** — the ZBDongle-E is seen and mapped
+  (`/dev/ttyUSB0` + by-id in-container) but ZHA has zero config presence, so it is wired
+  yet idle: Settings → Devices & Services → Add Integration → ZHA → serial `/dev/ttyUSB0`,
+  radio **EZSP**, baud **115200**. (2) HA **long-lived access token** (Profile → Security)
+  dropped into `C:\Users\xxtoo\ha-token.txt` (pinew-style local file — never in git/chat) →
+  provisioned silently to `server/data/ha.json` on Pi + NAS, restart, tiles auto-wire live.
+- Rollback: restore `dist.bak-ws7ay/index.html` (old bundle `index-mMktz6SG.js` still on
+  disk) + `index.js.bak-ws7ay` + `db.js.bak-ws7ay` → restart; DB undo = delete screen
+  (blocks cascade) + trim `loops.screen_ids`.

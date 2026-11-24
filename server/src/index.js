@@ -19,6 +19,8 @@ import authRouter from './routes/auth.js';
 import aiRouter from './routes/ai.js';
 import { writeAutoBackup } from './backup.js';
 import radarRouter from './routes/radar.js';
+import haRouter from './routes/ha.js';
+import { autofillHaBlocks } from './hass.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,6 +51,7 @@ app.use('/api', sensorsRouter);
 app.use('/api', photosRouter);
 app.use('/api', authRouter);
 app.use('/api', aiRouter);
+app.use('/api', haRouter);
 
 // Serve uploaded photos (persisted in DATA_DIR/photos)
 app.use('/photos', express.static(PHOTOS_DIR));
@@ -71,6 +74,10 @@ app.use(express.static(clientBuildPath));
 app.get('*', (req, res) => {
   res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
+
+// Home Assistant block auto-wiring (ws7ay): once HA is reachable, fill any seeded
+// ha_* block that still lacks an entity_id. Delayed so boot stays non-blocking.
+setTimeout(() => { autofillHaBlocks().catch(() => {}); }, 8000);
 
 // Schedule background iCal feed polling (Every 15 minutes)
 const feedCron = new CronJob('*/15 * * * *', async () => {
