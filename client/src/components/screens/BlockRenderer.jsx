@@ -10,6 +10,13 @@ import { DailyFactsBlock } from './widgets/DailyFactsBlock';
 import { WeatherForecastBlock } from './widgets/WeatherForecastBlock';
 import { HourlyWeatherBlock } from './widgets/HourlyWeatherBlock';
 import { RadarBlock } from './widgets/RadarBlock';
+import {
+  wsTile as WsTile,
+  wsWS as WsWS,
+  wxGUI as WxGUI,
+  rwRV as RwRV,
+  rwWindy as RwWindy
+} from './widgets/fdwKit';
 import { PhotoFrameBlock } from './widgets/PhotoFrameBlock';
 import { DateBlock } from './widgets/DateBlock';
 import { TodayButtonBlock } from './widgets/TodayButtonBlock';
@@ -156,10 +163,101 @@ export default function BlockRenderer({
         </div>
       );
 
+    case 'radar_windy':
+      return (
+        <div className={`${containerStyle} p-0.5`} style={containerBg}>
+          <RwWindy config={config} fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'radar_rainviewer':
+      return (
+        <div className={containerStyle} style={containerBg}>
+          <RwRV config={config} fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
     case 'radar_block':
       return (
         <div className={`${containerStyle} p-1`} style={containerBg}>
           <RadarBlock config={config} fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'ws_current':
+      return (
+        <div className={`${containerStyle} p-0.5`} style={containerBg}>
+          <WsTile config={config} kind="current" fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'ws_baro':
+      return (
+        <div className={`${containerStyle} p-0.5`} style={containerBg}>
+          <WsTile config={config} kind="baro" fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'ws_wind':
+      return (
+        <div className={`${containerStyle} p-0.5`} style={containerBg}>
+          <WsTile config={config} kind="wind" fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'ws_solar':
+      return (
+        <div className={`${containerStyle} p-0.5`} style={containerBg}>
+          <WsTile config={config} kind="solar" fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'ws_outdoor':
+      return (
+        <div className={`${containerStyle} p-0.5`} style={containerBg}>
+          <WsTile config={config} kind="outdoor" fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'ws_indoor':
+      return (
+        <div className={`${containerStyle} p-0.5`} style={containerBg}>
+          <WsTile config={config} kind="indoor" fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'ws_today':
+      return (
+        <div className={`${containerStyle} p-0.5`} style={containerBg}>
+          <WsTile config={config} kind="today" fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'ws_clock':
+      return (
+        <div className={`${containerStyle} p-0`} style={containerBg}>
+          <WsTile config={config} kind="clock" fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'ws_alerts':
+      return (
+        <div className={`${containerStyle} p-0.5`} style={containerBg}>
+          <WsTile config={config} kind="alerts" fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'weather_gui':
+      return (
+        <div className={containerStyle} style={containerBg}>
+          <WxGUI config={config} fontFamilyClass={fontFamilyClass} />
+        </div>
+      );
+
+    case 'weather_station':
+      return (
+        <div className={`${containerStyle} p-1`} style={containerBg}>
+          <WsWS config={config} fontFamilyClass={fontFamilyClass} />
         </div>
       );
 

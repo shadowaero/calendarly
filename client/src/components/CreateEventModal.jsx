@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { format } from 'date-fns';
 import { X, Calendar as CalendarIcon, Check } from 'lucide-react';
 
-export default function CreateEventModal({ isOpen, onClose, onCreated, initialDate }) {
+export default function CreateEventModal({ isOpen, onClose, onCreated, initialDate, editEvent }) {
   const [title, setTitle] = useState('');
   const [startDate, setStartDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('09:00');
@@ -10,6 +11,30 @@ export default function CreateEventModal({ isOpen, onClose, onCreated, initialDa
   const [color, setColor] = useState('#3B82F6');
   const [loading, setLoading] = useState(false);
 
+  // Edit mode: prefill from editEvent when opening; reset to "add" defaults on close.
+  React.useEffect(() => {
+    if (isOpen) {
+      if (editEvent && editEvent.id != null) {
+        const T = editEvent.start_time ? new Date(editEvent.start_time) : null;
+        setTitle(editEvent.title || '');
+        setStartDate(editEvent.all_day ? (editEvent.start_time || '').slice(0, 10) : T ? format(T, 'yyyy-MM-dd') : ((editEvent.start_time || '').slice(0, 10) || initialDate));
+        setStartTime(T && !editEvent.all_day ? format(T, 'HH:mm') : '09:00');
+        setAllDay(!!editEvent.all_day);
+        setCategory(editEvent.category || 'Family');
+        setColor(editEvent.color || '#3B82F6');
+      }
+    } else {
+      setTitle('');
+      setAllDay(false);
+      setCategory('Family');
+      setColor('#3B82F6');
+      setStartDate(initialDate || new Date().toISOString().split('T')[0]);
+      setStartTime('09:00');
+    }
+  }, [isOpen]);
+
+  const editing = !!(editEvent && editEvent.id != null);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
@@ -17,12 +42,15 @@ export default function CreateEventModal({ isOpen, onClose, onCreated, initialDa
     if (!title.trim()) return;
     setLoading(true);
 
-    const startIso = allDay ? `${startDate}T00:00:00.000Z` : `${startDate}T${startTime}:00.000Z`;
-    const endIso = allDay ? `${startDate}T23:59:59.000Z` : `${startDate}T${startTime}:00.000Z`;
+    // All-day keeps the plain date strings; timed events get timezone-safe ISO
+    // instants (built from an explicit local wall-clock string, so the shown time
+    // is the time that gets stored regardless of the machine's timezone).
+    const startIso = allDay ? `${startDate}T00:00:00.000Z` : new Date(`${startDate}T${startTime}:00`).toISOString();
+    const endIso = allDay ? `${startDate}T23:59:59.000Z` : new Date(`${startDate}T${startTime}:00`).toISOString();
 
     try {
-      const res = await fetch('/api/events', {
-        method: 'POST',
+      const res = await fetch(editing ? `/api/events/${editEvent.id}` : '/api/events', {
+        method: editing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
@@ -55,7 +83,7 @@ export default function CreateEventModal({ isOpen, onClose, onCreated, initialDa
           <X className="w-5 h-5" />
         </button>
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <CalendarIcon className="w-5 h-5 text-blue-400" /> Add Family Event
+          <CalendarIcon className="w-5 h-5 text-blue-400" /> {editing ? 'Edit Family Event' : 'Add Family Event'}
         </h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div>

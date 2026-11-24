@@ -111,7 +111,7 @@ export default function App() {
         try {
           const data = JSON.parse(event.data);
           if ([
-            'EVENT_CREATED', 'EVENT_DELETED', 'CALENDAR_SYNCED',
+            'EVENT_CREATED', 'EVENT_UPDATED', 'EVENT_DELETED', 'CALENDAR_SYNCED',
             'CHORE_UPDATED', 'CHORE_CREATED', 'CHORE_DELETED',
             'REWARD_REDEEMED', 'REWARD_CREATED', 'REWARD_DELETED',
             'MEMBER_CREATED', 'MEMBER_UPDATED', 'MEMBER_DELETED',

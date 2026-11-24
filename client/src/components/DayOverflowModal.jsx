@@ -1,8 +1,8 @@
 import React from 'react';
-import { X, Clock, Calendar, MapPin, Trash2 } from 'lucide-react';
+import { X, Clock, Calendar, MapPin, Trash2, Pencil } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
-export default function DayOverflowModal({ isOpen, onClose, date, events, onDeleteEvent }) {
+export default function DayOverflowModal({ isOpen, onClose, date, events, onDeleteEvent, onEditEvent }) {
   if (!isOpen || !date) return null;
 
   const dateHeading = format(date, 'EEEE, MMMM d, yyyy');
@@ -76,11 +76,20 @@ export default function DayOverflowModal({ isOpen, onClose, date, events, onDele
                     )}
                   </div>
 
-                  {/* Delete button (only for local touch events) */}
+                  {/* Edit + Delete buttons (only for local touch events) */}
+                  {ev.source === 'local' && onEditEvent && (
+                    <button
+                      onClick={() => onEditEvent(ev)}
+                      className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-950/40 rounded-lg transition shrink-0"
+                      title="Edit event"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
                   {ev.source === 'local' && onDeleteEvent && (
                     <button
                       onClick={() => onDeleteEvent(ev.id)}
-                      className="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition shrink-0"
+                      className="ml-6 p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition shrink-0"
                       title="Delete event"
                     >
                       <Trash2 className="w-4 h-4" />

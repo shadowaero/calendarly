@@ -67,6 +67,35 @@ router.post('/events', (req, res) => {
   }
 });
 
+router.put('/events/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, start_time, end_time, all_day, color, category } = req.body;
+    const existing = db.prepare("SELECT *, 'local' as source FROM events WHERE id = ?").get(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    db.prepare(`
+      UPDATE events
+      SET title = ?, description = ?, start_time = ?, end_time = ?, all_day = ?, color = ?, category = ?
+      WHERE id = ?
+    `).run(
+      title !== undefined ? title : existing.title,
+      description !== undefined ? description : existing.description,
+      start_time !== undefined ? start_time : existing.start_time,
+      end_time !== undefined ? end_time : existing.end_time,
+      all_day !== undefined ? (all_day ? 1 : 0) : existing.all_day,
+      color !== undefined ? color : existing.color,
+      category !== undefined ? category : existing.category,
+      id
+    );
+    const updated = db.prepare("SELECT *, 'local' as source FROM events WHERE id = ?").get(id);
+    broadcast('EVENT_UPDATED', updated);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 router.delete('/events/:id', (req, res) => {
   try {
     const { id } = req.params;

@@ -71,6 +71,19 @@ export function ScreenSidebarControls({
       case "quote_notes": return "Notes / Quote";
       case "dailyfacts": return "Daily Fact";
       case "photo_embed": return "Photo Frame";
+      case "weather_station": return "Weather Station";
+      case "ws_current": return "Weather: Current";
+      case "ws_baro": return "Weather: Barometer";
+      case "ws_wind": return "Weather: Wind";
+      case "ws_solar": return "Weather: Solar & UV";
+      case "ws_outdoor": return "Weather: Outdoor Sensor";
+      case "ws_indoor": return "Weather: Indoor Sensor";
+      case "ws_today": return "Weather: Today";
+      case "ws_clock": return "Weather: Clock";
+      case "ws_alerts": return "Weather: Alerts";
+      case "weather_gui": return "Weather GUI (hero dashboard)";
+      case "radar_rainviewer": return "Radar: Rainbow";
+      case "radar_windy": return "Radar: Windy";
       default: return type.replace("_", " ");
     }
   };
@@ -136,7 +149,19 @@ export function ScreenSidebarControls({
           <button type="button" onClick={() => addBlock("clock_weather")} className="px-1.5 py-1 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 text-cyan-200 rounded-lg text-[9px] font-bold">+ Clock</button>
           <button type="button" onClick={() => addBlock("weather_forecast")} className="px-1.5 py-1 bg-teal-950/80 hover:bg-teal-900 border border-teal-800 text-teal-200 rounded-lg text-[9px] font-bold">+ Forecast</button>
           <button type="button" onClick={() => addBlock("hourly_weather")} className="px-1.5 py-1 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 text-cyan-200 rounded-lg text-[9px] font-bold">+ Hourly</button>
+          <button type="button" onClick={() => addBlock("weather_gui")} className="px-1.5 py-1 bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-800 text-indigo-200 rounded-lg text-[9px] font-bold">+ Weather GUI</button>
           <button type="button" onClick={() => addBlock("radar_block")} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Radar</button>
+          <button type="button" onClick={() => addBlock("radar_windy")} className="px-1.5 py-1 bg-amber-950/80 hover:bg-amber-900 border border-amber-800 text-amber-200 rounded-lg text-[9px] font-bold">+ Windy</button>
+          <button type="button" onClick={() => addBlock("radar_rainviewer")} className="px-1.5 py-1 bg-blue-950/80 hover:bg-blue-900 border border-blue-800 text-blue-200 rounded-lg text-[9px] font-bold">+ RainView</button>
+          <button type="button" onClick={() => addBlock("ws_current")} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Current</button>
+          <button type="button" onClick={() => addBlock("ws_baro")} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Baro</button>
+          <button type="button" onClick={() => addBlock("ws_wind")} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Wind</button>
+          <button type="button" onClick={() => addBlock("ws_solar")} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Solar</button>
+          <button type="button" onClick={() => addBlock("ws_outdoor")} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Outdoor</button>
+          <button type="button" onClick={() => addBlock("ws_indoor")} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Indoor</button>
+          <button type="button" onClick={() => addBlock("ws_today")} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Today</button>
+          <button type="button" onClick={() => addBlock("ws_clock")} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Clock</button>
+          <button type="button" onClick={() => addBlock("ws_alerts")} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Alerts</button>
           <button type="button" onClick={() => addBlock("date_block")} className="px-1.5 py-1 bg-violet-950/80 hover:bg-violet-900 border border-violet-800 text-violet-200 rounded-lg text-[9px] font-bold">+ Date</button>
           <button type="button" onClick={() => addBlock("today_button")} className="px-1.5 py-1 bg-amber-950/80 hover:bg-amber-900 border border-amber-800 text-amber-200 rounded-lg text-[9px] font-bold">+ Today</button>
           <button type="button" onClick={() => addBlock("text")} className="px-1.5 py-1 bg-fuchsia-950/80 hover:bg-fuchsia-900 border border-fuchsia-800 text-fuchsia-200 rounded-lg text-[9px] font-bold">+ Text</button>
@@ -377,6 +402,32 @@ export function ScreenSidebarControls({
               </div>
             </div>
 
+            {/* Windy Radar Config */}
+            {selectedBlock.type === "radar_windy" && (
+              <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-1.5">
+                <span className="font-bold text-amber-400 uppercase text-[8px]">Windy Radar Config</span>
+                <div className="grid grid-cols-2 gap-1">
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Latitude</label>
+                    <input type="text" placeholder="28.800" value={selectedBlock.config?.lat || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { lat: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Longitude</label>
+                    <input type="text" placeholder="-81.644" value={selectedBlock.config?.lon || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { lon: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
+                </div>
+                <input type="text" placeholder="Zoom (3-17, e.g. 11)" value={selectedBlock.config?.zoom || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { zoom: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                <select value={selectedBlock.config?.overlay || "radar"} onChange={(e) => updateBlockConfig(selectedBlockIdx, { overlay: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1">
+                  <option value="radar">Overlay: Radar</option>
+                  <option value="satellite">Overlay: Satellite</option>
+                  <option value="temperature">Overlay: Temperature</option>
+                  <option value="wind">Overlay: Wind</option>
+                  <option value="pressure">Overlay: Pressure</option>
+                  <option value="clouds">Overlay: Clouds</option>
+                </select>
+              </div>
+            )}
+
             {/* Calendar Month Specific Controls */}
             {selectedBlock.type === "calendar_month" && (
               <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-1.5">
@@ -432,6 +483,43 @@ export function ScreenSidebarControls({
               </div>
             )}
 
+            {/* Rainbow Radar (RainViewer) Config */}
+            {selectedBlock.type === "radar_rainviewer" && (
+              <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-1.5">
+                <span className="font-bold text-sky-400 uppercase text-[8px]">Rainbow Radar Config</span>
+                <div className="grid grid-cols-2 gap-1">
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Latitude</label>
+                    <input type="text" placeholder="28.800" value={selectedBlock.config?.lat || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { lat: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Longitude</label>
+                    <input type="text" placeholder="-81.644" value={selectedBlock.config?.lon || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { lon: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Zoom (3-13, default 7)</label>
+                    <input type="text" placeholder="8" value={selectedBlock.config?.zoom || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { zoom: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Palette</label>
+                    <select value={selectedBlock.config?.color ?? 8} onChange={(e) => updateBlockConfig(selectedBlockIdx, { color: Number(e.target.value), rainbowP: 1 })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1">
+                      <option value={8}>Universal Blue</option>
+                      <option value={4}>Nexrad</option>
+                      <option value={5}>Rainviewer</option>
+                      <option value={0}>Semi-Classic</option>
+                      <option value={1}>Original</option>
+                      <option value={2}>Rainbow SELEX</option>
+                      <option value={3}>Titan</option>
+                      <option value={6}>Palette 6</option>
+                      <option value={7}>Palette 7</option>
+                      <option value={9}>Palette 9</option>
+                    </select>
+                  </div>
+                </div>
+                <input type="text" placeholder="Label (optional)" value={selectedBlock.config?.label || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { label: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+              </div>
+            )}
+
             {/* Calendar Agenda Specific Controls */}
             {selectedBlock.type === "calendar_agenda" && (
               <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-1.5">
@@ -449,6 +537,52 @@ export function ScreenSidebarControls({
                     />
                   </div>
 
+                </div>
+              </div>
+            )}
+
+            {/* Weather Station Widget Config (shared across ws_* tiles) */}
+            {["ws_current", "ws_baro", "ws_wind", "ws_solar", "ws_outdoor", "ws_indoor", "ws_today", "ws_clock", "ws_alerts"].indexOf(selectedBlock.type) >= 0 && (
+              <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-1.5">
+                <span className="font-bold text-cyan-400 uppercase text-[8px]">Weather Widget Config</span>
+                <div className="grid grid-cols-2 gap-1">
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Zip / City</label>
+                    <input type="text" placeholder="32757" value={selectedBlock.config?.zip || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { zip: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Indoor channel</label>
+                    <input type="text" placeholder="B" value={selectedBlock.config?.indoorChannel || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { indoorChannel: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[7.5px] text-slate-400 block mb-0.5">Outdoor channel</label>
+                  <input type="text" placeholder="A" value={selectedBlock.config?.outdoorChannel || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { outdoorChannel: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                </div>
+              </div>
+            )}
+
+            {/* Weather GUI Config */}
+            {selectedBlock.type === "weather_gui" && (
+              <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-1.5">
+                <span className="font-bold text-indigo-300 uppercase text-[8px]">Weather GUI Config</span>
+                <div className="grid grid-cols-2 gap-1">
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">City label</label>
+                    <input type="text" placeholder="MOUNT DORA" value={selectedBlock.config?.city || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { city: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Zip / Location</label>
+                    <input type="text" placeholder="32757" value={selectedBlock.config?.zip || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { zip: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Outdoor channel</label>
+                    <input type="text" placeholder="A" value={selectedBlock.config?.outdoorChannel || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { outdoorChannel: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Indoor channel</label>
+                    <input type="text" placeholder="B" value={selectedBlock.config?.indoorChannel || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { indoorChannel: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
                 </div>
               </div>
             )}

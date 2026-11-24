@@ -299,7 +299,8 @@ router.post('/screens/import', (req, res) => {
 router.get('/loops', (req, res) => {
   try {
     const loops = db.prepare('SELECT * FROM loops ORDER BY id ASC').all();
-    res.json(loops.map(l => ({ ...l, screen_ids: l.screen_ids ? JSON.parse(l.screen_ids) : [] })));
+    const alive = db.prepare('SELECT id FROM screens').all().map(r => r.id);
+    res.json(loops.map(l => ({ ...l, screen_ids: l.screen_ids ? JSON.parse(l.screen_ids).filter(sid => alive.includes(sid)) : [] })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -316,7 +317,7 @@ router.post('/loops', (req, res) => {
     const result = stmt.run(
       name.trim(),
       interval_seconds || 30,
-      JSON.stringify(screen_ids || []),
+      JSON.stringify((screen_ids || []).filter(sid => { try { return !!db.prepare('SELECT 1 FROM screens WHERE id = ?').get(sid); } catch (e) { return true; } })),
       pause_on_touch ? 1 : 0
     );
     const created = db.prepare('SELECT * FROM loops WHERE id = ?').get(result.lastInsertRowid);
@@ -339,7 +340,7 @@ router.put('/loops/:id', (req, res) => {
     `).run(
       name !== undefined ? name.trim() : existing.name,
       interval_seconds !== undefined ? interval_seconds : existing.interval_seconds,
-      screen_ids !== undefined ? JSON.stringify(screen_ids) : existing.screen_ids,
+      screen_ids !== undefined ? JSON.stringify((screen_ids || []).filter(sid => { try { return !!db.prepare('SELECT 1 FROM screens WHERE id = ?').get(sid); } catch (e) { return true; } })) : existing.screen_ids,
       pause_on_touch !== undefined ? (pause_on_touch ? 1 : 0) : existing.pause_on_touch,
       id
     );

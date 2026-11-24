@@ -13,6 +13,7 @@ import googleRouter from './routes/google.js';
 import screensRouter from './routes/screens.js';
 import backupRouter from './routes/backup.js';
 import weatherRouter from './routes/weather.js';
+import sensorsRouter from './routes/sensors.js';
 import photosRouter, { PHOTOS_DIR } from './routes/photos.js';
 import authRouter from './routes/auth.js';
 import aiRouter from './routes/ai.js';
@@ -44,6 +45,7 @@ app.use('/api', googleRouter);
 app.use('/api', screensRouter);
 app.use('/api', backupRouter);
 app.use('/api', weatherRouter);
+app.use('/api', sensorsRouter);
 app.use('/api', photosRouter);
 app.use('/api', authRouter);
 app.use('/api', aiRouter);
@@ -53,7 +55,6 @@ app.use('/photos', express.static(PHOTOS_DIR));
 
 // Rainbow Weather tile proxy (ws7aj) — injects keys + disk cache; see routes/radar.js
 app.use('/radar/api', radarRouter);
-
 // Weather & System status proxy helper (optional external widget data)
 app.get('/api/status', (req, res) => {
   res.json({

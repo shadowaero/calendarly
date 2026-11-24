@@ -68,4 +68,33 @@ router.get('/weather/radar', async (req, res) => {
   }
 });
 
+// Active National Weather Service alerts (cached 10 min per lat/lon).
+let alertCache = { key: null, data: null, at: 0 };
+router.get('/weather/alerts', async (req, res) => {
+  try {
+    const zip = req.query.zip || req.query.location || '';
+    let lat = Number(req.query.lat), lon = Number(req.query.lon);
+    if ((!Number.isFinite(lat) || !Number.isFinite(lon)) && zip) {
+      const geo = await geocodeLocation(zip);
+      if (geo) { lat = geo.lat; lon = geo.lon; }
+    }
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) { lat = 28.80249; lon = -81.64452; }
+    const key = lat.toFixed(3) + ',' + lon.toFixed(3);
+    const now = Date.now();
+    if (alertCache.data && alertCache.key === key && now - alertCache.at < 600000) return res.json(alertCache.data);
+    const r = await fetch('https://api.weather.gov/alerts/active?status=actual&point=' + lat + ',' + lon,
+      { headers: { 'User-Agent': 'family-dashboard-kiosk', Accept: 'application/geo+json' } });
+    if (!r.ok) throw new Error('alerts http ' + r.status);
+    const j = await r.json();
+    const alerts = (j.features || []).slice(0, 5).map(f => ({
+      event: f.properties.event, headline: f.properties.headline || '',
+      severity: f.properties.severity || '', effective: f.properties.effective,
+      ends: f.properties.ends || f.properties.expires || ''
+    }));
+    const data = { alerts };
+    alertCache = { key, data, at: now };
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 export default router;

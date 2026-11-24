@@ -1,6 +1,7 @@
 // Weather via Open-Meteo (free, no API key, worldwide).
 // Provides current conditions, hourly forecast, and a 4-day forecast.
 
+import { recordPressureSample, pressureStats } from './sensordb.js';
 let cache = { key: null, data: null, fetchedAt: 0 };
 
 const WMO_CODES = {
@@ -58,9 +59,9 @@ export async function getWeather(lat, lon, units = 'fahrenheit', days = 4) {
   }
 
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-    `&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,apparent_temperature` +
+    `&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,apparent_temperature,is_day,cloud_cover,pressure_msl,surface_pressure,uv_index,shortwave_radiation` +
     `&hourly=temperature_2m,weather_code,precipitation_probability` +
-    `&daily=weather_code,temperature_2m_max,temperature_2m_min` +
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max` +
     `&temperature_unit=${units}&wind_speed_unit=mph&timezone=auto&forecast_days=${forecastDays}`;
 
   const res = await fetch(url);
@@ -99,6 +100,15 @@ export async function getWeather(lat, lon, units = 'fahrenheit', days = 4) {
       apparent: Math.round(current.apparent_temperature ?? current.temperature_2m),
       humidity: current.relative_humidity_2m ?? null,
       wind: current.wind_speed_10m ?? null,
+      code: current.weather_code,
+      is_day: current.is_day,
+      cloud_cover: current.cloud_cover ?? null,
+      wind_dir: current.wind_direction_10m ?? null,
+      wind_gusts: current.wind_gusts_10m ?? null,
+      pressure_msl: current.pressure_msl ?? null,
+      surface_pressure: current.surface_pressure ?? null,
+      uv_index: current.uv_index ?? null,
+      shortwave_radiation: current.shortwave_radiation ?? null,
       condition: wmoToCondition(current.weather_code)
     },
     hourly: hourlyAll.slice(startIdx, startIdx + 24).map((h) => ({
@@ -113,10 +123,19 @@ export async function getWeather(lat, lon, units = 'fahrenheit', days = 4) {
       date: t,
       max: Math.round(raw.daily.temperature_2m_max[i]),
       min: Math.round(raw.daily.temperature_2m_min[i]),
+      sunrise: raw.daily.sunrise ? raw.daily.sunrise[i] : null,
+      sunset: raw.daily.sunset ? raw.daily.sunset[i] : null,
+      uvMax: raw.daily.uv_index_max ? raw.daily.uv_index_max[i] : null,
       code: raw.daily.weather_code[i],
       condition: wmoToCondition(raw.daily.weather_code[i])
     }))
   };
+
+  try {
+    if (Number.isFinite(current.pressure_msl)) recordPressureSample(Math.round(current.pressure_msl * 10) / 10);
+    const pstats = pressureStats();
+    if (pstats) data.pressure = pstats;
+  } catch (e) { console.error('[weather] pressure stats failed:', e.message); }
 
   cache = { key, data, fetchedAt: now };
   return data;

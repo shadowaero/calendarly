@@ -29,6 +29,7 @@ export default function CalendarView({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isFeedModalOpen, setIsFeedModalOpen] = useState(false);
   const [targetCreateDate, setTargetCreateDate] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
 
   const isRolling = viewMode === 'rolling';
   const numWeeks = Math.min(Math.max(Number(rollingWeeks) || 4, 2), 5);
@@ -164,8 +165,8 @@ export default function CalendarView({
         })}
       </div>
 
-      <DayOverflowModal isOpen={isDayModalOpen} onClose={() => setIsDayModalOpen(false)} date={selectedDate} events={selectedDate ? getEventsForDay(selectedDate) : []} onDeleteEvent={onDeleteEvent} />
-      <CreateEventModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onCreated={onRefreshEvents} initialDate={targetCreateDate} />
+      <DayOverflowModal isOpen={isDayModalOpen} onClose={() => setIsDayModalOpen(false)} date={selectedDate} events={selectedDate ? getEventsForDay(selectedDate) : []} onDeleteEvent={onDeleteEvent} onEditEvent={(ev) => { setEditTarget(ev); setTargetCreateDate(format(selectedDate, 'yyyy-MM-dd')); setIsDayModalOpen(false); setIsCreateModalOpen(true); }} />
+      <CreateEventModal isOpen={isCreateModalOpen} onClose={() => { setIsCreateModalOpen(false); setEditTarget(null); }} onCreated={onRefreshEvents} initialDate={targetCreateDate} editEvent={editTarget} />
       <FeedManagerModal isOpen={isFeedModalOpen} onClose={() => setIsFeedModalOpen(false)} feeds={feeds || []} onRefreshFeeds={onRefreshEvents} onAddFeed={onAddFeed} onEditFeed={onEditFeed} onDeleteFeed={onDeleteFeed} />
     </div>
   );
