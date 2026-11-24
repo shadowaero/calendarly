@@ -1131,3 +1131,28 @@ Three asks: fix the neon-green Chalkboard background, raise the radar zoom cap 1
 - Rollback: restore `dist.bak-ws7ay/index.html` (old bundle `index-mMktz6SG.js` still on
   disk) + `index.js.bak-ws7ay` + `db.js.bak-ws7ay` → restart; DB undo = delete screen
   (blocks cascade) + trim `loops.screen_ids`.
+
+### ws7ay addendum — token provisioned + the DATA_DIR lesson (2026-11-24 evening)
+- **ha.json lives in DATA_DIR, NOT `server/data/`** — the service declares
+  `Environment=DATA_DIR=/opt/calendarly/data` (Pi; `dashboard.sqlite` lives there) and the
+  NAS container uses its persistent mount **`/app/data`** (host
+  `/volume1/docker/family-dashboard/data`). `hass.js` reads `DATA_DIR/ha.json`; the first
+  provision wrote to a dead `server/data/` path (Pi) / a nonexistent dir (NAS docker cp)
+  and `/api/ha/status` kept answering `configured:false` despite a valid file. Rule of
+  thumb: **ha.json goes next to `dashboard.sqlite`**. (The stray Pi copy was deleted —
+  no token sprawl.) Corollary: `haConfig()` reads per-call, so a corrected file flips
+  `configured` without a restart; restart is only needed to re-trigger autofill.
+- `hass.js` hardened: both HA fetches carry `AbortSignal.timeout(5000)` — a dead HA can
+  no longer hang kiosk tile polls (fetch had no default timeout).
+- Provisioned via `tmp/ship-hatoken.cjs` (token read from `C:\Users\xxtoo\ha-token.txt`,
+  never printed into chat/logs; base64-over-stdin; JSON self-checks on both hosts).
+  Verified 2/2: `configured:true`, **196 entities** live (switch 89 / number 67 /
+  media_player 18 / sensor 15 / binary_sensor 6 / weather 1), `/api/ha/states` streams
+  real values. Autofill wired **6/7 blocks** per spec (light→switch fallback = 2 Sonos
+  switches; 4 sensor picks = first sensor-class matches). `ha_climate` stayed EMPTY by
+  design — HA has no climate/light entities yet (ZHA just added, zero devices paired).
+  **After pairing Zigbee devices, RE-PICK tiles via the editor entity dropdown** (autofill
+  never overwrites a filled slot): swap the 2 Sonos switches for real lights, the backup
+  sensors for temp/humidity/power. ZHA entry present (1× in core.config_entries).
+- Verify-code lesson: `GET /api/screens/:id` returns a FLAT `{id,name,…,blocks}` object —
+  a `scr.screen.id` assumption crashed a verify run mid-flight. Guard response shapes.

@@ -32,7 +32,10 @@ export async function haStates() {
   if (cache.states && now - cache.at < CACHE_MS) return cache.states;
   const { baseUrl, token } = haConfig();
   if (!token) return null;
-  const r = await fetch(baseUrl + '/api/states', { headers: { Authorization: 'Bearer ' + token } });
+  const r = await fetch(baseUrl + '/api/states', {
+    headers: { Authorization: 'Bearer ' + token },
+    signal: AbortSignal.timeout(5000)
+  });
   if (!r.ok) throw new Error('ha http ' + r.status);
   const states = await r.json();
   cache = { at: now, states };
@@ -71,7 +74,8 @@ export async function haCallService(domain, service, data) {
   const r = await fetch(baseUrl + '/api/services/' + domain + '/' + service, {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(5000)
   });
   if (!r.ok) throw new Error('ha http ' + r.status);
   cache.at = 0; // states changed — bust the cache so tiles refresh instantly
