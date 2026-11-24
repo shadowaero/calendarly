@@ -1160,11 +1160,23 @@ Three asks: fix the neon-green Chalkboard background, raise the radar zoom cap 1
   (PowerShell single quotes inside such a string are literal chars, NOT quoting). A `$p`
   fd-scan silently scanned nothing and `echo $?` printed "True" — producing a false
   "no process holds the radio" verdict that sent diagnosis in the wrong direction. Keep
-  `$` out of inline ssh strings; use `$`-free forms (`find /proc -maxdepth 3 -lname
-  '*ttyUSB*'`, tr+grep) or the spawnSync-file pattern (argv-passed, immune to pwsh).
-- ZHA endgame (11/24): entry configured perfectly (ezsp / /dev/ttyUSB0 / 115200; EUI64
-  read off the stick = `zigbee.db` formed) BUT the radio was held by no process and init
-  logged nothing — EmberZNet 7.x NCP firmware needs **flow_control:"software"** while the
-  entry had `null`. Remediation: re-add ZHA with Software flow control (fall back to None
-  for older firmware), re-seat the dongle if needed (lsusb showed Device 009 = repeated
-  re-enumeration). Kiosk side is unaffected: tiles + service calls verified end-to-end.
+  `$` out of inline ssh strings; use `$`-free forms (`ls -l /proc/[0-9]*/fd/* | grep ttyUSB` —
+  note BusyBox/Alpine `find` has NO `-lname`; GNU find does), tr+grep, or the
+  spawnSync-file pattern (argv-passed, immune to pwsh).
+- ZHA endgame (11/24) — CORRECTED: the earlier "radio not held, needs
+  flow_control:software" read was WRONG (two broken holder probes — pwsh `$p` expansion,
+  then BusyBox `find` lacking `-lname` — faked a "no holder" verdict). Truth: one fresh
+  **Set up automatically** wizard run (HA 2026.11 — the serial-settings form is a
+  probe-failure fallback only) brought the radio up first try at `flow_control:None`.
+  Ground truth = `docker exec homeassistant sh -c 'ls -l /proc/[0-9]*/fd/* | grep ttyUSB'`
+  (the glob must expand INSIDE the container): `/proc/73/fd/61 -> /dev/ttyUSB0`, sustained.
+  Also retracted: "USB re-enumeration" — container `/dev` node mtime churn is a Docker
+  artifact; USB health = HOST `ls -la /dev/ttyUSB0` mtime + `lsusb` device# (stable since
+  16:08, Bus 003 Dev 009). "44 disabled entries" on the dongle = ZHA coordinator
+  packet-counter sensors (MAC_*/APS_*/NWK/ZDO families), `disabled_by:integration` BY
+  DESIGN — enable per-entity only for RF debugging. Closeout disabled totals: 100 =
+  44 zha + 53 sonos + 3 sun. Verified ZHA entry data:
+  `{radio_type:ezsp, device:{path:/dev/ttyUSB0, baudrate:115200, flow_control:None}}`.
+  Tooling: `tmp/ha-zha-inventory.cjs` (argv-spawned ssh + zero-single-quote python) dumps
+  entity/device/disabled inventories + holder proof in one shot. Note: NAS sudo password
+  `pinew` is rejected (silent-sudo needs whatever `pinew.txt` actually holds).
