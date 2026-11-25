@@ -44,6 +44,9 @@ export const PROMPT_SCHEMA = `
 - iframe_embed: { url: string }
 - date_block: { showDate: boolean, showYear: boolean, fontFamily, bgOpacity }
 - today_button: { label: string, fontFamily }
+- ha_media: { entity_id: string (media_player.*), label: string, fontFamily, bgOpacity }
+- ha_script: { entity_id: string (script.*), label: string, icon: emoji string, color: css hex color, prompt: boolean (typed-message announce row), message: string (fixed message sent as script variable), fontFamily, bgOpacity }
+- ha_devices: { title: string, domains: string (comma list, e.g. "light,switch"), columns: 1|2|3|4, fontFamily, bgOpacity }
 
 6. BACKGROUND COLOR & GRADIENT PRESETS (background_type: "color"):
 "Deep Dark" #090D16 | "Slate Blue" #0F172A | "Obsidian" #050811 | "Midnight" linear-gradient(135deg,#0a1128 0%,#1c2541 100%) | "Forest" linear-gradient(135deg,#061a14 0%,#0c2b20 100%) | "Harvest Amber" linear-gradient(135deg,#1c0d02 0%,#3d1c06 100%) | "Spooky Twilight" linear-gradient(135deg,#120726 0%,#2b0c3d 50%,#0d0417 100%) | "Autumn Bronze" linear-gradient(135deg,#261105 0%,#4a2108 100%) | "Holiday Pine" linear-gradient(135deg,#051a0e 0%,#0f3820 100%) | "Christmas Crimson" linear-gradient(135deg,#240508 0%,#470d13 100%) | "Winter Frost" linear-gradient(135deg,#061524 0%,#102a45 100%) | "Chalkboard Green" #2a9313

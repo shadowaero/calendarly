@@ -212,6 +212,7 @@ export function initDatabase() {
 
   seedDefaults();
   seedHomeAssistantScreen();
+  seedSmartHomeScreens();
 }
 
 // Seed the "Home Assistant" kiosk screen (ws7ay) + attach it to the kiosk loop(s).
@@ -268,6 +269,99 @@ function seedHomeAssistantScreen() {
   } catch (e) {
     console.error('seedHomeAssistantScreen error:', e.message);
   }
+}
+
+// Seed the two smart-home kiosk screens (ws7ba): "Whole-Home Audio" (every Sonos
+// zone + Group / Ungroup / Announce actions) and "IoT & Devices" (auto-filling HA
+// device grids). Idempotent like seedHomeAssistantScreen: creates once, then only
+// ensures loop membership. Entity IDs are wired explicitly (stable on the NAS HA).
+function seedSmartHomeScreens() {
+  const IBC = db.prepare(`
+    INSERT INTO screen_blocks (screen_id, type, pos_x, pos_y, width, height, x_percent, y_percent, w_percent, h_percent, config)
+    VALUES (?, ?, 0, 0, 6, 6, ?, ?, ?, ?, ?)
+  `);
+  const mk = (name, description, bg, blocks) => {
+    try {
+      const existing = db.prepare('SELECT id FROM screens WHERE name = ? AND is_template = 0').get(name);
+      let sid;
+      if (existing) {
+        sid = existing.id;
+      } else {
+        const res = db.prepare(`
+          INSERT INTO screens (name, description, orientation, resolution, background_type, background_value)
+          VALUES (?, ?, 'landscape', '1080p', 'color', ?)
+        `).run(name, description, bg);
+        sid = res.lastInsertRowid;
+        for (const b of blocks) {
+          IBC.run(sid, b[0], b[1], b[2], b[3], b[4], JSON.stringify(b[5]));
+        }
+        console.log('[DB] Seeded smart-home screen "' + name + '" (id ' + sid + ', ' + blocks.length + ' blocks)');
+      }
+      const targets = new Set(
+        db.prepare("SELECT assigned_id AS id FROM displays WHERE assigned_type = 'loop'").all().map((r) => r.id)
+      );
+      targets.add(1);
+      for (const lid of targets) {
+        const row = db.prepare('SELECT id, screen_ids FROM loops WHERE id = ?').get(lid);
+        if (!row) continue;
+        let ids = [];
+        try { ids = JSON.parse(row.screen_ids || '[]') || []; } catch { ids = []; }
+        if (ids.indexOf(sid) < 0) {
+          ids.push(sid);
+          db.prepare('UPDATE loops SET screen_ids = ? WHERE id = ?').run(JSON.stringify(ids), lid);
+          console.log('[DB] Appended "' + name + '" to loop ' + lid);
+        }
+      }
+    } catch (e) {
+      console.error('seedSmartHomeScreens(' + name + ') error:', e.message);
+    }
+  };
+
+  const zones = [
+    ['sonos_everywhere', 'EVERYWHERE'],
+    ['living_room_arc_era_sub_living_room_arc_era_sub', 'LIVING · ARC'],
+    ['living_room_fives_living_room_fives', 'LIVING · FIVES'],
+    ['living_room_sym_living_room_sym', 'LIVING · SYM'],
+    ['living_room_amp_living_room_amp', 'LIVING · AMP'],
+    ['kitchen_kitchen', 'KITCHEN'],
+    ['coffee_bar_coffee_bar', 'COFFEE BAR'],
+    ['game_room_game_room', 'GAME ROOM'],
+    ['office_playbar_office_playbar', 'OFFICE'],
+    ['gazebo_gazebo', 'GAZEBO'],
+    ['patio_patio', 'PATIO'],
+    ['garage_garage', 'GARAGE'],
+    ['olivers_room_olivers_room', "OLIVER'S ROOM"],
+    ['mstr_bed_arc_rear_sym_sub_mstr_bed_arc_rear_sym_sub', 'MASTER · ARC'],
+    ['master_bed_port_sub_master_bed_port_sub', 'MASTER · PORT+SUB'],
+    ['master_bed_front_symfonisk_master_bed_front_symfonisk', 'MASTER · SYMFONISK'],
+    ['master_bed_3s_master_bed_3s', 'MASTER · 3s'],
+    ['master_bathroom_master_bathroom', 'MASTER BATH']
+  ];
+  const audio = [
+    ['text', 0, 0, 100, 8, { text: '🎵  WHOLE-HOME AUDIO', color: 'light', fontWeight: 'bold', fontSize: 32 }],
+    ['ha_script', 0.5, 9, 27, 10, { entity_id: 'script.sonos_everywhere', label: 'Group Everywhere', icon: '🔗', color: '#2dd4bf' }],
+    ['ha_script', 0.5, 20, 27, 10, { entity_id: 'script.sonos_ungroup', label: 'Ungroup Everywhere', icon: '🔓', color: '#94a3b8' }],
+    ['ha_script', 0.5, 31, 27, 14, { entity_id: 'script.announce_everywhere', label: 'Announce', icon: '📣', color: '#fbbf24', prompt: true }],
+    ['ha_script', 0.5, 46, 13.25, 11, { entity_id: 'script.announce_everywhere', label: 'Dinner', icon: '🍕', color: '#fbbf24', message: 'Dinner is ready, everyone!' }],
+    ['ha_script', 14.25, 46, 13.25, 11, { entity_id: 'script.announce_everywhere', label: 'Front Door', icon: '🚪', color: '#fbbf24', message: 'Someone is at the front door.' }],
+    ['ha_script', 0.5, 58, 13.25, 11, { entity_id: 'script.announce_everywhere', label: 'Wind Down', icon: '🌙', color: '#fbbf24', message: 'It is time to start winding down for the evening.' }],
+    ['ha_script', 14.25, 58, 13.25, 11, { entity_id: 'script.announce_everywhere', label: 'Load Up', icon: '🚗', color: '#fbbf24', message: 'Everyone load up, we are leaving in five minutes!' }]
+  ];
+  zones.forEach((z, i) => {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    audio.push(['ha_media', 29 + col * 23.5, 9 + row * 15.2, 22.5, 14.6, { entity_id: 'media_player.' + z[0], label: z[1] }]);
+  });
+
+  mk('Whole-Home Audio', 'Sonos zones + Group / Ungroup / Announce actions', '#050811', audio);
+  mk('IoT & Devices', 'Auto-filling HA device grids (WiFi / Zigbee / more)', '#090D16', [
+    ['text', 0, 0, 100, 8, { text: '📡  DEVICES — WIFI · ZIGBEE · MORE', color: 'light', fontWeight: 'bold', fontSize: 32 }],
+    ['ha_devices', 1, 10, 48, 42, { title: 'Lights & Plugs', domains: 'light,switch', columns: 2 }],
+    ['ha_devices', 51, 10, 48, 42, { title: 'Sensors', domains: 'sensor,binary_sensor', columns: 2 }],
+    ['ha_devices', 1, 54, 31, 44, { title: 'Climate & Air', domains: 'climate,fan,humidifier', columns: 1 }],
+    ['ha_devices', 34, 54, 31, 44, { title: 'Doors & Covers', domains: 'cover,lock', columns: 1 }],
+    ['ha_devices', 68, 54, 31, 44, { title: 'Helpers & Meters', domains: 'input_boolean,number', columns: 1 }]
+  ]);
 }
 
 function seedDefaults() {

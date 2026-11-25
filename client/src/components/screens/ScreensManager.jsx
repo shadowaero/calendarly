@@ -117,7 +117,7 @@ export default function ScreensManager({
       y_percent: 5,
       w_percent: 30,
       h_percent: 25,
-      config: type === 'chores_tracker' ? { showRewards: true } : {}
+      config: type === 'chores_tracker' ? { showRewards: true } : type === 'ha_devices' ? { title: 'Devices', domains: 'light,switch', columns: 2 } : type === 'ha_script' ? { label: 'Action' } : {}
     };
     setScreenForm(prev => ({
       ...prev,

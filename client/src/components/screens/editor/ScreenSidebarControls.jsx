@@ -95,6 +95,9 @@ export function ScreenSidebarControls({
       case "ha_climate": return "HA: Thermostat";
       case "ha_light": return "HA: Light";
       case "ha_sensor": return "HA: Sensor";
+      case "ha_media": return "HA: Player";
+      case "ha_script": return "HA: Action";
+      case "ha_devices": return "HA: Device Grid";
       default: return type.replace("_", " ");
     }
   };
@@ -182,6 +185,9 @@ export function ScreenSidebarControls({
           <button type="button" onClick={() => addBlock("ha_climate")} className="px-1.5 py-1 bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-200 rounded-lg text-[9px] font-bold">+ Thermo</button>
           <button type="button" onClick={() => addBlock("ha_light")} className="px-1.5 py-1 bg-amber-950/80 hover:bg-amber-900 border border-amber-800 text-amber-200 rounded-lg text-[9px] font-bold">+ Light</button>
           <button type="button" onClick={() => addBlock("ha_sensor")} className="px-1.5 py-1 bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-800 text-emerald-200 rounded-lg text-[9px] font-bold">+ Sensor</button>
+          <button type="button" onClick={() => addBlock("ha_media")} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Player</button>
+          <button type="button" onClick={() => addBlock("ha_script")} className="px-1.5 py-1 bg-teal-950/80 hover:bg-teal-900 border border-teal-800 text-teal-200 rounded-lg text-[9px] font-bold">+ Action</button>
+          <button type="button" onClick={() => addBlock("ha_devices")} className="px-1.5 py-1 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 text-cyan-200 rounded-lg text-[9px] font-bold">+ Devices</button>
         </div>
       </div>
 
@@ -555,6 +561,64 @@ export function ScreenSidebarControls({
               </div>
             )}
 
+            {/* HA Action button (ha_script): script entity + icon + message/prompt */}
+            {selectedBlock.type === "ha_script" && (
+              <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-1.5">
+                <span className="font-bold text-teal-300 uppercase text-[8px]">HA Action Config</span>
+                <div className="grid grid-cols-2 gap-1">
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Icon (emoji)</label>
+                    <input type="text" value={selectedBlock.config?.icon || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { icon: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Accent</label>
+                    <select value={selectedBlock.config?.color || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { color: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1">
+                      <option value="">Sky</option>
+                      <option value="#2dd4bf">Teal</option>
+                      <option value="#fbbf24">Amber</option>
+                      <option value="#f87171">Rose</option>
+                      <option value="#a3e635">Lime</option>
+                      <option value="#c084fc">Purple</option>
+                    </select>
+                  </div>
+                </div>
+                <label className="flex items-center gap-1.5 text-[8px] text-slate-300 cursor-pointer">
+                  <input type="checkbox" checked={Boolean(selectedBlock.config?.prompt)} onChange={(e) => updateBlockConfig(selectedBlockIdx, { prompt: e.target.checked })} className="rounded border-slate-700 text-cyan-500 bg-slate-950 w-3 h-3" />
+                  Typed message prompt (announce)
+                </label>
+                {!selectedBlock.config?.prompt && (
+                  <div>
+                    <label className="text-[7.5px] text-slate-400 block mb-0.5">Message (sent as script variable)</label>
+                    <input type="text" value={selectedBlock.config?.message || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { message: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* HA Device grid (ha_devices): domain list auto-fills as devices pair */}
+            {selectedBlock.type === "ha_devices" && (
+              <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-1.5">
+                <span className="font-bold text-teal-300 uppercase text-[8px]">Device Grid Config</span>
+                <div>
+                  <label className="text-[7.5px] text-slate-400 block mb-0.5">Title</label>
+                  <input type="text" value={selectedBlock.config?.title || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { title: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                </div>
+                <div>
+                  <label className="text-[7.5px] text-slate-400 block mb-0.5">Domains (comma list)</label>
+                  <input type="text" placeholder="light,switch" value={selectedBlock.config?.domains || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { domains: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                </div>
+                <div>
+                  <label className="text-[7.5px] text-slate-400 block mb-0.5">Columns</label>
+                  <select value={selectedBlock.config?.columns || 2} onChange={(e) => updateBlockConfig(selectedBlockIdx, { columns: Number(e.target.value) })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1">
+                    <option value={1}>1</option>
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                    <option value={4}>4</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
             {/* Weather Station Widget Config (shared across ws_* tiles) */}
             {["ws_current", "ws_baro", "ws_wind", "ws_solar", "ws_outdoor", "ws_indoor", "ws_today", "ws_clock", "ws_alerts"].indexOf(selectedBlock.type) >= 0 && (
               <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-1.5">
@@ -659,8 +723,8 @@ export function ScreenSidebarControls({
               </div>
             )}
 
-            {/* Home Assistant tile config (shared by ha_climate / ha_light / ha_sensor) */}
-            {["ha_climate", "ha_light", "ha_sensor"].indexOf(selectedBlock.type) >= 0 && (
+            {/* Home Assistant tile config (shared by ha_climate / ha_light / ha_sensor / ha_media / ha_script) */}
+            {["ha_climate", "ha_light", "ha_sensor", "ha_media", "ha_script"].indexOf(selectedBlock.type) >= 0 && (
               <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-1.5">
                 <span className="font-bold text-rose-300 uppercase text-[8px]">Home Assistant Entity</span>
                 <div>
@@ -677,6 +741,10 @@ export function ScreenSidebarControls({
                           ? e.domain === "climate"
                           : selectedBlock.type === "ha_light"
                           ? e.domain === "light" || e.domain === "switch"
+                          : selectedBlock.type === "ha_media"
+                          ? e.domain === "media_player"
+                          : selectedBlock.type === "ha_script"
+                          ? e.domain === "script"
                           : e.domain === "sensor" || e.domain === "binary_sensor"
                       )
                       .map((e) => (

@@ -3,7 +3,7 @@ import { haConfig, haConfigured, haStates, haCallService, HA_ALLOWED_SERVICES } 
 
 const router = Router();
 
-const PICK_DOMAINS = ['climate', 'light', 'switch', 'fan', 'cover', 'humidifier', 'lock', 'sensor', 'binary_sensor', 'media_player', 'weather', 'number', 'input_boolean'];
+const PICK_DOMAINS = ['climate', 'light', 'switch', 'fan', 'cover', 'humidifier', 'lock', 'sensor', 'binary_sensor', 'media_player', 'weather', 'number', 'input_boolean', 'script'];
 
 // GETs stay open on the LAN (kiosk + editor read freely); the mutation endpoint
 // below is whitelisted + entity-checked (same policy stance as routes/sensors.js:

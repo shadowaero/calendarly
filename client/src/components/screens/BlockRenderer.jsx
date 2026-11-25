@@ -24,6 +24,9 @@ import { CalendarLegendBlock } from './widgets/CalendarLegendBlock';
 import { HaClimateBlock } from './widgets/HaClimateBlock';
 import { HaLightBlock } from './widgets/HaLightBlock';
 import { HaSensorBlock } from './widgets/HaSensorBlock';
+import { HaMediaBlock } from './widgets/HaMediaBlock';
+import { HaScriptBlock } from './widgets/HaScriptBlock';
+import { HaDevicesBlock } from './widgets/HaDevicesBlock';
 import { FONT_CLASSES } from './fonts';
 import { getBlockBackgroundStyle } from './backgrounds';
 
@@ -327,6 +330,27 @@ export default function BlockRenderer({
       return (
         <div className={`${containerStyle} p-2`} style={containerBg}>
           <HaSensorBlock config={config} clientMode={clientMode} />
+        </div>
+      );
+
+    case 'ha_media':
+      return (
+        <div className={`${containerStyle} p-2`} style={containerBg}>
+          <HaMediaBlock config={config} clientMode={clientMode} />
+        </div>
+      );
+
+    case 'ha_script':
+      return (
+        <div className={`${containerStyle} p-2`} style={containerBg}>
+          <HaScriptBlock config={config} clientMode={clientMode} />
+        </div>
+      );
+
+    case 'ha_devices':
+      return (
+        <div className={`${containerStyle} p-2`} style={containerBg}>
+          <HaDevicesBlock config={config} clientMode={clientMode} />
         </div>
       );
 

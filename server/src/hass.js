@@ -52,7 +52,14 @@ export const HA_ALLOWED_SERVICES = {
   fan: ['toggle', 'turn_on', 'turn_off'],
   climate: ['set_temperature', 'set_hvac_mode'],
   cover: ['open_cover', 'close_cover', 'stop_cover'],
-  homeassistant: ['toggle']
+  homeassistant: ['toggle'],
+  // ws7ba — Sonos / whole-home audio (media tiles + join/unjoin groups) and the
+  // script domain powering Group / Ungroup / Announce from the kiosk screens.
+  media_player: ['turn_on', 'turn_off', 'toggle', 'volume_set', 'volume_up', 'volume_down', 'volume_mute', 'media_play', 'media_pause', 'media_stop', 'media_play_pause', 'media_next_track', 'media_previous_track', 'play_media', 'select_source', 'join', 'unjoin', 'clear_playlist', 'shuffle_set', 'repeat_set', 'snapshot', 'restore'],
+  script: ['turn_on'],
+  lock: ['lock', 'unlock'],
+  input_boolean: ['toggle', 'turn_on', 'turn_off'],
+  number: ['set_value']
 };
 const ENTITY_RE = /^[a-z_0-9]+\.[a-zA-Z0-9_]+$/;
 
