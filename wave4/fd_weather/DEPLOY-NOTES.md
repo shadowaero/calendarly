@@ -1278,3 +1278,10 @@ Three asks: fix the neon-green Chalkboard background, raise the radar zoom cap 1
 ### ws7bb follow-up (2026-11-24) - retired the ws7ay "Home Assistant" demo screen (id 21)
 
 Removed the 7-tile HA demo screen (thermostat upper-left) per request - superseded by the Whole-Home Audio / IoT & Devices screens. `db.js`: dropped `seedHomeAssistantScreen()` (call + function) and added a guarded one-shot retirement migration (id=21 AND name guard) that deletes the screen (blocks cascade) and strips it from loop membership. Shipped to Pi 4 + restart; verified `[DB] Retired Home Assistant screen (id 21)`, loop 1 now rotates 18,12,20,1,22,23 (6 screens). Rollback: `db.js.bak-ws7bb` on the Pi.
+
+### ws7bc (2026-11-24) - NAS deploy: audio/IoT screens version on family-dashboard container
+
+- **Target:** `family-dashboard` docker container on `ShadowAero@192.168.76.188` (NAS, host port 3080 -> container 3000). Pre-overwrite lineage check: md5 of the container's {db,hass,routes/ha,aiPrompt}.js == Pi `.bak-ws7ba` copies (byte-identical to repo pre-edit state) - safe overwrite confirmed.
+- **Shipped via `tmp/ship-nas.cjs`** (base64-over-ssh-stdin, md5-verified per file): client dist {index.html, index-BeW6UQkK.js, index-B6ys_heJ.css} + server src {db.js, hass.js, routes/ha.js, aiPrompt.js}. `docker restart family-dashboard`. Rollback: `*.bak-ws7bc` inside the container + old bundles retained.
+- **Retirement guard hardened:** the Home Assistant demo-screen retirement now matches by name + block-type fingerprint (ha_climate, ha_light x2, ha_sensor x4) instead of row id - works across instance DBs with different id sequences; still idempotent and cannot touch user-created screens.
+- **Verified on NAS :3080:** seeded `Whole-Home Audio` (id 19, 26 blocks) + `IoT & Devices` (id 20, 6 blocks); no Home Assistant screen remains; loop 1 = 14,12,17,2,19,20; `/api/ha/services` shows the widened whitelist (media_player/script/lock/input_boolean/number). Pi and NAS now run the same version (ws7ba bundle, ?v=ws7ba).

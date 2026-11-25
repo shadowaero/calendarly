@@ -212,21 +212,26 @@ export function initDatabase() {
 
   // One-shot retirement (2026-11-24): remove the ws7ay "Home Assistant" demo screen
   // (7 HA tiles, thermostat upper-left) - superseded by "Whole-Home Audio" and
-  // "IoT & Devices". Deletes the screen (blocks cascade) and any loop membership.
+  // "IoT & Devices". Matches by name + seed fingerprint (works on any instance DB),
+  // deletes the screen (blocks cascade) and strips it from loop membership.
   try {
-    const retired = db.prepare("SELECT id FROM screens WHERE id = 21 AND name = 'Home Assistant'").get();
-    if (retired) {
-      db.prepare('DELETE FROM screens WHERE id = ?').run(retired.id);
+    const fingerprint = ['ha_climate', 'ha_light', 'ha_light', 'ha_sensor', 'ha_sensor', 'ha_sensor', 'ha_sensor'];
+    const cands = db.prepare("SELECT id FROM screens WHERE name = 'Home Assistant' AND is_template = 0").all();
+    for (const c of cands) {
+      const types = db.prepare('SELECT type FROM screen_blocks WHERE screen_id = ? ORDER BY id ASC').all(c.id).map((b) => b.type);
+      const isSeed = types.length === fingerprint.length && types.every((t, i) => t === fingerprint[i]);
+      if (!isSeed) continue;
+      db.prepare('DELETE FROM screens WHERE id = ?').run(c.id);
       for (const l of db.prepare('SELECT id, screen_ids FROM loops').all()) {
         let ids = [];
         try { ids = JSON.parse(l.screen_ids || '[]') || []; } catch { ids = []; }
-        const kept = ids.filter((n) => n !== retired.id);
+        const kept = ids.filter((n) => n !== c.id);
         if (kept.length !== ids.length) {
           db.prepare('UPDATE loops SET screen_ids = ? WHERE id = ?').run(JSON.stringify(kept), l.id);
           console.log('[DB] Removed Home Assistant screen from loop ' + l.id);
         }
       }
-      console.log('[DB] Retired Home Assistant screen (id ' + retired.id + ')');
+      console.log('[DB] Retired Home Assistant screen (id ' + c.id + ')');
     }
   } catch (e) {
     console.error('Retire Home Assistant screen:', e.message);
