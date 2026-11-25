@@ -1180,3 +1180,26 @@ Three asks: fix the neon-green Chalkboard background, raise the radar zoom cap 1
   Tooling: `tmp/ha-zha-inventory.cjs` (argv-spawned ssh + zero-single-quote python) dumps
   entity/device/disabled inventories + holder proof in one shot. Note: NAS sudo password
   `pinew` is rejected (silent-sudo needs whatever `pinew.txt` actually holds).
+
+### Housekeeping — stale HA snapshot deleted + Syncthing topology (2026-11-24 evening)
+- Per user decision, the stale Jul-25-2025 HA config snapshot (840 K — old
+  `configuration.yaml`, `secrets.yaml`, `home-assistant_v2.db` 565 K recorder history,
+  `.storage/` registries) at `/volume1/Einstein/Home Assistant/` is DELETED on BOTH
+  Syncthing endpoints and folder `einstein-homeassistant` unshared on both (REST
+  `DELETE /rest/config/folders/einstein-homeassistant` → 200, 0 config refs left), so
+  nothing can restore it. `rm -rf` bypasses the Synology recycle bin (verified clean).
+- Topology worth keeping: `.188` = host **IDX6011** (source, Syncthing `type=sendonly`),
+  `.168` = host **DXP8800** (replica, `type=receiveonly`) — the `/volume1/Einstein/`
+  tree syncs as ~13 per-subdir folder pairs (only subdirs sync; root extras like `books/`
+  and `portainer-backup_*.tar.gz` stay per-box). Both run `lscr.io/linuxserver/syncthing`.
+  `.168` config is host-readable (`/volume1/docker/syncthing/config/config.xml`);
+  `.188`'s is root-only → read via `docker exec syncthing grep … /config/config.xml`.
+  API key = `<apikey>` in config.xml; carry it pwsh-safely with `cut -c 9- | xargs -I{}`
+  (no `$`, no command substitution). Receive-only replica caveat: deleting a receive-only
+  side alone is a "local change" the source can undo — durable delete = unshare first,
+  then rm both source and replica.
+- Safety facts that justified the permanent rm: live HA config is a DIFFERENT path
+  (`/volume1/docker/homeassistant/config` on .188, from `docker inspect homeassistant`
+  mounts) and held a byte-identical 161 B `secrets.yaml`; nothing unique was in the
+  stale copy. Post-delete verified 2/2: dirs GONE, other `einstein-*` shares intact,
+  live config listing unaffected.
