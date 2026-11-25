@@ -210,70 +210,35 @@ export function initDatabase() {
     console.error('Migration error on screen_blocks:', e);
   }
 
-  seedDefaults();
-  seedHomeAssistantScreen();
-  seedSmartHomeScreens();
-}
-
-// Seed the "Home Assistant" kiosk screen (ws7ay) + attach it to the kiosk loop(s).
-// Idempotent: creates once, then only ensures loop membership. Blocks are seeded
-// with empty entity_id and auto-wired by hass.js once HA is reachable.
-function seedHomeAssistantScreen() {
+  // One-shot retirement (2026-11-24): remove the ws7ay "Home Assistant" demo screen
+  // (7 HA tiles, thermostat upper-left) - superseded by "Whole-Home Audio" and
+  // "IoT & Devices". Deletes the screen (blocks cascade) and any loop membership.
   try {
-    const existing = db.prepare("SELECT id FROM screens WHERE name = 'Home Assistant' AND is_template = 0").get();
-    let sid;
-    if (existing) {
-      sid = existing.id;
-    } else {
-      const res = db.prepare(`
-        INSERT INTO screens (name, description, orientation, resolution, background_type, background_value)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(
-        'Home Assistant',
-        'Native Home Assistant tiles (thermostat / lights / sensors)',
-        'landscape',
-        '1080p',
-        'color',
-        '#090D16'
-      );
-      sid = res.lastInsertRowid;
-      const ib = db.prepare(`
-        INSERT INTO screen_blocks (screen_id, type, pos_x, pos_y, width, height, x_percent, y_percent, w_percent, h_percent, config)
-        VALUES (?, ?, 0, 0, 6, 6, ?, ?, ?, ?, ?)
-      `);
-      ib.run(sid, 'ha_climate', 2, 6, 30, 52, JSON.stringify({ entity_id: '', label: 'Thermostat', step: 1 }));
-      ib.run(sid, 'ha_light', 2, 61, 30, 17, JSON.stringify({ entity_id: '', label: 'Light 1' }));
-      ib.run(sid, 'ha_light', 2, 80, 30, 16, JSON.stringify({ entity_id: '', label: 'Light 2' }));
-      ib.run(sid, 'ha_sensor', 34, 6, 31, 44, JSON.stringify({ entity_id: '', label: 'Sensor 1' }));
-      ib.run(sid, 'ha_sensor', 67, 6, 31, 44, JSON.stringify({ entity_id: '', label: 'Sensor 2' }));
-      ib.run(sid, 'ha_sensor', 34, 53, 31, 43, JSON.stringify({ entity_id: '', label: 'Sensor 3' }));
-      ib.run(sid, 'ha_sensor', 67, 53, 31, 43, JSON.stringify({ entity_id: '', label: 'Sensor 4' }));
-      console.log('[DB] Seeded Home Assistant screen (id ' + sid + ')');
-    }
-    // Attach to the kiosk loop(s): any loop driving a display + loop 1 as fallback.
-    const targets = new Set(
-      db.prepare("SELECT assigned_id AS id FROM displays WHERE assigned_type = 'loop'").all().map((r) => r.id)
-    );
-    targets.add(1);
-    for (const lid of targets) {
-      const row = db.prepare('SELECT id, screen_ids FROM loops WHERE id = ?').get(lid);
-      if (!row) continue;
-      let ids = [];
-      try { ids = JSON.parse(row.screen_ids || '[]') || []; } catch { ids = []; }
-      if (ids.indexOf(sid) < 0) {
-        ids.push(sid);
-        db.prepare('UPDATE loops SET screen_ids = ? WHERE id = ?').run(JSON.stringify(ids), lid);
-        console.log('[DB] Appended Home Assistant screen to loop ' + lid);
+    const retired = db.prepare("SELECT id FROM screens WHERE id = 21 AND name = 'Home Assistant'").get();
+    if (retired) {
+      db.prepare('DELETE FROM screens WHERE id = ?').run(retired.id);
+      for (const l of db.prepare('SELECT id, screen_ids FROM loops').all()) {
+        let ids = [];
+        try { ids = JSON.parse(l.screen_ids || '[]') || []; } catch { ids = []; }
+        const kept = ids.filter((n) => n !== retired.id);
+        if (kept.length !== ids.length) {
+          db.prepare('UPDATE loops SET screen_ids = ? WHERE id = ?').run(JSON.stringify(kept), l.id);
+          console.log('[DB] Removed Home Assistant screen from loop ' + l.id);
+        }
       }
+      console.log('[DB] Retired Home Assistant screen (id ' + retired.id + ')');
     }
   } catch (e) {
-    console.error('seedHomeAssistantScreen error:', e.message);
+    console.error('Retire Home Assistant screen:', e.message);
   }
+
+  seedDefaults();
+  seedSmartHomeScreens();
 }
 
 // Seed the two smart-home kiosk screens (ws7ba): "Whole-Home Audio" (every Sonos
 // zone + Group / Ungroup / Announce actions) and "IoT & Devices" (auto-filling HA
-// device grids). Idempotent like seedHomeAssistantScreen: creates once, then only
+// device grids). Idempotent (house seed pattern): creates once, then only
 // ensures loop membership. Entity IDs are wired explicitly (stable on the NAS HA).
 function seedSmartHomeScreens() {
   const IBC = db.prepare(`
