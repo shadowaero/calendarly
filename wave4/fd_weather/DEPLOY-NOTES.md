@@ -1203,3 +1203,39 @@ Three asks: fix the neon-green Chalkboard background, raise the radar zoom cap 1
   mounts) and held a byte-identical 161 B `secrets.yaml`; nothing unique was in the
   stale copy. Post-delete verified 2/2: dirs GONE, other `einstein-*` shares intact,
   live config listing unaffected.
+
+- Sonos "own group" HA setup (live on NAS HA 2026-11-24 ~19:50) — the 17 Sonos rooms were already
+  auto-discovered as media_players (Sony BRAVIA TV excluded). Added the common kit:
+  - `media_player.sonos_everywhere` — control-together group entity (YAML `media_player:
+    - platform: group` in configuration.yaml; all 17 rooms; fans out volume / play / pause).
+    GOTCHA: platform-YAML entities load only at BOOT — `homeassistant.reload_core_config` does
+    NOT pick them up; container restart required (done, proven at boot).
+  - `script.sonos_everywhere` ("Sonos: Group Everywhere") — play-in-sync whole-house group via
+    `media_player.join` (master = first AVAILABLE room in preference order: Living Room AMP,
+    Kitchen, Fives, Sym, ...); `script.sonos_ungroup` ("Sonos: Ungroup All") dissolves all
+    groups; `script.announce_everywhere` ("Announce Everywhere", takes a `message` field) speaks
+    TTS everywhere via `tts.speak` + tts.google_translate_en_com.
+  - ALL THREE are fault-tolerant by design: one dynamic shared room list (YAML anchor `&rooms`)
+    skips unavailable/unknown rooms at run time; join/ungroup run room-by-room with
+    `continue_on_error`; announcements fire ONE PARALLEL BRANCH PER ROOM (17 branches) so all
+    voices start together and one slow room cannot block the rest.
+  - Verified live (silent tests, exact restore): Group Everywhere formed a 12-room group under
+    the Living Room AMP; Ungroup All returned everything to solo; the pre-existing Master Bed
+    group (Mstr Bed Arc + Bed 3's + Front Symfonisk + Master Bathroom) captured to
+    tmp/sonos-baseline.json first and restored SET-EXACTLY afterwards. Announce test run fully
+    MUTED (all 17 muted -> tts ran -> all unmuted; tmp/sonos-mute-backup.txt) — audible check
+    left to the user.
+  - Fleet quirks proven during testing (why the fault tolerance is mandatory): game_room
+    (192.168.76.211) rejects ALL join commands with UPnP 501 regardless of master (stuck-group
+    state; power-cycle or regroup in the Sonos app clears it); in one run 5/16 rooms rejected
+    joins at their own IPs (UPnP 501/1001 + one 30-s read timeout) and only 12 grouped — re-run
+    the script to pick up stragglers; MULTI-TARGET BULK SERVICE CALLS PARTIALLY ABORT on a
+    flaky member (proved twice: the 16-member bulk join died at member 4; a bulk unmute stopped
+    at living_room_fives read-timeout .80 and left 6 speakers muted, restored per-room after) —
+    keep every fleet-wide call per-room. office_playbar flaps unavailable.
+  - Files: live in the HA container /config/{configuration.yaml,scripts.yaml}; backups
+    configuration.yaml.bak-sonos + scripts.yaml.bak-sonos (pre-change). Exact shipped YAML kept
+    in repo tmp/: sonos-configuration.yaml + sonos-scripts-v5-p{1,2,3}.yaml (p1+p2+p3
+    concatenated at ship). Rollback: restore the two .bak-sonos files + `docker restart
+    homeassistant`.
+
