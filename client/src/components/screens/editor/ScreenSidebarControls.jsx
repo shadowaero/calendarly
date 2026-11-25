@@ -61,8 +61,11 @@ export function ScreenSidebarControls({
   const isPattern = (k) => screenForm.background_type === "pattern" && screenForm.background_value === k;
   const isPhoto = (u) => screenForm.background_type === "photo" && screenForm.background_value === u;
 
-  const getBlockDisplayName = (type) => {
+  const getBlockDisplayName = (block) => {
+    const type = block.type;
+    const sonosSections = { player: "Now Playing", volumes: "Zone Volumes", groups: "Groups", grouping: "Grouping" };
     switch (type) {
+      case "ha_sonos_panel": return "Sonos: " + (sonosSections[block.config?.section] || "Panel");
       case "calendar_month": return "Month Grid";
       case "calendar_agenda": return "Agenda";
       case "calendar_legend": return "Feed Legend";
@@ -188,6 +191,10 @@ export function ScreenSidebarControls({
           <button type="button" onClick={() => addBlock("ha_media")} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Player</button>
           <button type="button" onClick={() => addBlock("ha_script")} className="px-1.5 py-1 bg-teal-950/80 hover:bg-teal-900 border border-teal-800 text-teal-200 rounded-lg text-[9px] font-bold">+ Action</button>
           <button type="button" onClick={() => addBlock("ha_devices")} className="px-1.5 py-1 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 text-cyan-200 rounded-lg text-[9px] font-bold">+ Devices</button>
+          <button type="button" onClick={() => addBlock("ha_sonos_panel", { section: "player", artwork: "background", title: "Now Playing" })} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Now Playing</button>
+          <button type="button" onClick={() => addBlock("ha_sonos_panel", { section: "volumes", title: "Zone Volumes" })} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Volumes</button>
+          <button type="button" onClick={() => addBlock("ha_sonos_panel", { section: "groups", title: "Groups" })} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Groups</button>
+          <button type="button" onClick={() => addBlock("ha_sonos_panel", { section: "grouping", title: "Grouping" })} className="px-1.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-200 rounded-lg text-[9px] font-bold">+ Grouping</button>
         </div>
       </div>
 
@@ -214,7 +221,7 @@ export function ScreenSidebarControls({
                 <div className="flex items-center justify-between text-[9px]">
                   <span className="font-bold text-white flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                    {getBlockDisplayName(block.type)}
+                    {getBlockDisplayName(block)}
                   </span>
                   <div className="flex items-center gap-1 shrink-0">
                     <select
@@ -246,7 +253,7 @@ export function ScreenSidebarControls({
           <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 flex flex-col gap-2 mt-1 shadow-inner">
             <div className="flex items-center justify-between">
               <span className="font-bold text-cyan-400 uppercase tracking-wider text-[9px]">
-                {getBlockDisplayName(selectedBlock.type)} Settings
+                {getBlockDisplayName(selectedBlock)} Settings
               </span>
               <button
                 type="button"
@@ -615,6 +622,69 @@ export function ScreenSidebarControls({
                     <option value={3}>3</option>
                     <option value={4}>4</option>
                   </select>
+                </div>
+              </div>
+            )}
+
+            {/* Sonos section panel (ha_sonos_panel) — one movable card section per block */}
+            {selectedBlock.type === "ha_sonos_panel" && (
+              <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-1.5">
+                <span className="font-bold text-teal-300 uppercase text-[8px]">Sonos Section Config</span>
+                <div>
+                  <label className="text-[7.5px] text-slate-400 block mb-0.5">Section</label>
+                  <select
+                    value={selectedBlock.config?.section || "player"}
+                    onChange={(e) => updateBlockConfig(selectedBlockIdx, { section: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1"
+                  >
+                    <option value="player">Now Playing (art + transport + volume)</option>
+                    <option value="volumes">Zone Volumes</option>
+                    <option value="groups">Groups (members + ungroup)</option>
+                    <option value="grouping">Grouping (tap to join/leave)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[7.5px] text-slate-400 block mb-0.5">Title (blank = default)</label>
+                  <input type="text" value={selectedBlock.config?.title || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { title: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
+                </div>
+                <label className="flex items-center gap-1.5 text-[8px] text-slate-300 cursor-pointer">
+                  <input type="checkbox" checked={selectedBlock.config?.visible !== false} onChange={(e) => updateBlockConfig(selectedBlockIdx, { visible: e.target.checked })} className="rounded border-slate-700 text-cyan-500 bg-slate-950 w-3 h-3" />
+                  Show section (uncheck to hide without deleting)
+                </label>
+                {(selectedBlock.config?.section || "player") === "player" && (
+                  <div className="grid grid-cols-2 gap-1">
+                    <div>
+                      <label className="text-[7.5px] text-slate-400 block mb-0.5">Artwork</label>
+                      <select
+                        value={selectedBlock.config?.artwork || "background"}
+                        onChange={(e) => updateBlockConfig(selectedBlockIdx, { artwork: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1"
+                      >
+                        <option value="background">Background</option>
+                        <option value="side">Side</option>
+                        <option value="off">Off</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[7.5px] text-slate-400 block mb-0.5">Focus player</label>
+                      <select
+                        value={selectedBlock.config?.entity_id || ""}
+                        onChange={(e) => updateBlockConfig(selectedBlockIdx, { entity_id: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1"
+                      >
+                        <option value="">Auto (most recent)</option>
+                        {haEntities
+                          .filter((e) => e.domain === "media_player")
+                          .map((e) => (
+                            <option key={e.entity_id} value={e.entity_id}>{e.name}</option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <label className="text-[7.5px] text-slate-400 block mb-0.5">Player filter (comma ids, blank = all zones)</label>
+                  <input type="text" placeholder="media_player.kitchen_kitchen,..." value={selectedBlock.config?.players || ""} onChange={(e) => updateBlockConfig(selectedBlockIdx, { players: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded text-[8px] text-white p-1" />
                 </div>
               </div>
             )}

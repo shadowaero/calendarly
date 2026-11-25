@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { haConfig, haConfigured, haStates, haCallService, HA_ALLOWED_SERVICES } from '../hass.js';
+import { haConfig, haConfigured, haStates, haCallService, haAsset, HA_ALLOWED_SERVICES } from '../hass.js';
 
 const router = Router();
 
@@ -42,12 +42,25 @@ router.get('/ha/states', async (req, res) => {
     const states = await haStates();
     if (!states) return res.status(503).json({ error: 'ha not configured', states: [] });
     const ids = String(req.query.ids || '').split(',').map((s) => s.trim()).filter(Boolean);
-    const out = ids.length
+    const domain = String(req.query.domain || '').trim();
+    let out = ids.length
       ? ids.map((id) => states.find((s) => s.entity_id === id) || null).filter(Boolean)
       : states;
+    if (domain) out = out.filter((s) => String(s.entity_id).split('.')[0] === domain);
     res.json({ states: out, serverTime: Date.now() });
   } catch (err) {
     res.status(502).json({ error: err.message, states: [] });
+  }
+});
+
+// Album/artwork image proxy (ws7bd) — relative HA paths only; keeps HA's URL and
+// token on the server while the Sonos panel renders entity_picture artwork.
+router.get('/ha/art', async (req, res) => {
+  try {
+    const { buf, type } = await haAsset(req.query.path);
+    res.set('Content-Type', type).set('Cache-Control', 'public, max-age=120').send(buf);
+  } catch (err) {
+    res.status(err.status || 502).set('Content-Type', 'image/png').send('');
   }
 });
 

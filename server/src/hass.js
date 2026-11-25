@@ -143,3 +143,23 @@ export async function autofillHaBlocks() {
     return { filled: 0, error: e.message };
   }
 }
+
+// ws7bd — fetch a HA-hosted asset (entity_picture / media proxy paths) server-side
+// so clients never see HA's base URL or token. Path must be relative and
+// same-origin on the HA instance; absolute URLs are fetched by the client directly.
+export async function haAsset(path) {
+  const { baseUrl, token } = haConfig();
+  if (!token) throw Object.assign(new Error('ha not configured'), { status: 503 });
+  const p = String(path || '');
+  if (!/^\/(api|local|hacsfiles)\//.test(p)) {
+    throw Object.assign(new Error('bad asset path'), { status: 400 });
+  }
+  const r = await fetch(baseUrl + p, {
+    headers: { Authorization: 'Bearer ' + token },
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!r.ok) throw Object.assign(new Error('ha http ' + r.status), { status: 502 });
+  const type = r.headers.get('content-type') || 'image/jpeg';
+  const buf = Buffer.from(await r.arrayBuffer());
+  return { buf, type };
+}

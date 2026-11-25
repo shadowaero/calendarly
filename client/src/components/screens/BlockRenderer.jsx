@@ -27,6 +27,7 @@ import { HaSensorBlock } from './widgets/HaSensorBlock';
 import { HaMediaBlock } from './widgets/HaMediaBlock';
 import { HaScriptBlock } from './widgets/HaScriptBlock';
 import { HaDevicesBlock } from './widgets/HaDevicesBlock';
+import { HaSonosPanel } from './widgets/HaSonosPanel';
 import { FONT_CLASSES } from './fonts';
 import { getBlockBackgroundStyle } from './backgrounds';
 
@@ -351,6 +352,13 @@ export default function BlockRenderer({
       return (
         <div className={`${containerStyle} p-2`} style={containerBg}>
           <HaDevicesBlock config={config} clientMode={clientMode} />
+        </div>
+      );
+
+    case 'ha_sonos_panel':
+      return (
+        <div className={containerStyle} style={containerBg}>
+          <HaSonosPanel config={config} clientMode={clientMode} />
         </div>
       );
 

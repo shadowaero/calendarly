@@ -110,14 +110,14 @@ export default function ScreensManager({
     setIsEditing(false);
   };
 
-  const addBlock = (type) => {
+  const addBlock = (type, seedConfig) => {
     const newBlock = {
       type,
       x_percent: 5,
       y_percent: 5,
       w_percent: 30,
       h_percent: 25,
-      config: type === 'chores_tracker' ? { showRewards: true } : type === 'ha_devices' ? { title: 'Devices', domains: 'light,switch', columns: 2 } : type === 'ha_script' ? { label: 'Action' } : {}
+      config: seedConfig ? { ...seedConfig } : type === 'chores_tracker' ? { showRewards: true } : type === 'ha_devices' ? { title: 'Devices', domains: 'light,switch', columns: 2 } : type === 'ha_script' ? { label: 'Action' } : type === 'ha_sonos_panel' ? { section: 'player', artwork: 'background', title: 'Now Playing' } : {}
     };
     setScreenForm(prev => ({
       ...prev,

@@ -237,6 +237,7 @@ export function initDatabase() {
     console.error('Retire Home Assistant screen:', e.message);
   }
 
+  migrateSonosSectionLayout();
   seedDefaults();
   seedSmartHomeScreens();
 }
@@ -245,6 +246,49 @@ export function initDatabase() {
 // zone + Group / Ungroup / Announce actions) and "IoT & Devices" (auto-filling HA
 // device grids). Idempotent (house seed pattern): creates once, then only
 // ensures loop membership. Entity IDs are wired explicitly (stable on the NAS HA).
+// ws7bd — "Whole-Home Audio" rebuilt as the custom-sonos-card section layout: one
+// ha_sonos_panel block per card section (each freely draggable/resizable/hideable in
+// Screen Studio) plus the announce strip. Shared by seedSmartHomeScreens() below and
+// the one-shot migration for the already-seeded Pi/NAS DBs.
+const SONOS_SECTION_BLOCKS = [
+  ['text', 0, 0, 100, 8, { text: '🎵  WHOLE-HOME AUDIO', color: 'light', fontWeight: 'bold', fontSize: 32 }],
+  ['ha_sonos_panel', 0.5, 9, 43, 59, { section: 'player', title: 'Now Playing', artwork: 'background' }],
+  ['ha_sonos_panel', 44, 9, 18, 59, { section: 'volumes', title: 'Zone Volumes' }],
+  ['ha_sonos_panel', 62.5, 9, 18, 59, { section: 'grouping', title: 'Grouping' }],
+  ['ha_sonos_panel', 81, 9, 18.5, 59, { section: 'groups', title: 'Groups' }],
+  ['ha_script', 0.5, 69.5, 27, 29.5, { entity_id: 'script.announce_everywhere', label: 'Announce', icon: '📣', color: '#fbbf24', prompt: true }],
+  ['ha_script', 28, 69.5, 17.4, 29.5, { entity_id: 'script.announce_everywhere', label: 'Dinner', icon: '🍕', color: '#fbbf24', message: 'Dinner is ready, everyone!' }],
+  ['ha_script', 45.9, 69.5, 17.4, 29.5, { entity_id: 'script.announce_everywhere', label: 'Front Door', icon: '🚪', color: '#fbbf24', message: 'Someone is at the front door.' }],
+  ['ha_script', 63.8, 69.5, 17.4, 29.5, { entity_id: 'script.announce_everywhere', label: 'Wind Down', icon: '🌙', color: '#fbbf24', message: 'It is time to start winding down for the evening.' }],
+  ['ha_script', 81.7, 69.5, 17.8, 29.5, { entity_id: 'script.announce_everywhere', label: 'Load Up', icon: '🚗', color: '#fbbf24', message: 'Everyone load up, we are leaving in five minutes!' }]
+];
+
+// ws7bd — one-shot rebuild of the ws7ba 26-block seed into the movable Sonos-section
+// layout above. Fingerprint-guarded (name + exact type multiset: 1 text + 7 ha_script
+// + 18 ha_media): once the owner rearranges/edits anything the fingerprint stops
+// matching and this can never clobber their layout. Runs before the seed so fresh DBs
+// simply get the new layout.
+function migrateSonosSectionLayout() {
+  try {
+    const screen = db.prepare("SELECT id FROM screens WHERE name = 'Whole-Home Audio' AND is_template = 0").get();
+    if (!screen) return;
+    const types = db.prepare('SELECT type FROM screen_blocks WHERE screen_id = ? ORDER BY id ASC').all(screen.id).map((b) => b.type);
+    const counts = {};
+    for (const t of types) counts[t] = (counts[t] || 0) + 1;
+    const isSeed = types.length === 26 && counts.text === 1 && counts['ha_script'] === 7 && counts['ha_media'] === 18;
+    if (!isSeed) return;
+    db.prepare('DELETE FROM screen_blocks WHERE screen_id = ?').run(screen.id);
+    const ins = db.prepare(`
+      INSERT INTO screen_blocks (screen_id, type, pos_x, pos_y, width, height, x_percent, y_percent, w_percent, h_percent, config)
+      VALUES (?, ?, 0, 0, 6, 6, ?, ?, ?, ?, ?)
+    `);
+    for (const b of SONOS_SECTION_BLOCKS) ins.run(screen.id, b[0], b[1], b[2], b[3], b[4], JSON.stringify(b[5]));
+    console.log('[DB] Rebuilt "Whole-Home Audio" (id ' + screen.id + ') as movable Sonos sections (' + SONOS_SECTION_BLOCKS.length + ' blocks)');
+  } catch (e) {
+    console.error('migrateSonosSectionLayout error:', e.message);
+  }
+}
+
 function seedSmartHomeScreens() {
   const IBC = db.prepare(`
     INSERT INTO screen_blocks (screen_id, type, pos_x, pos_y, width, height, x_percent, y_percent, w_percent, h_percent, config)
@@ -287,43 +331,7 @@ function seedSmartHomeScreens() {
     }
   };
 
-  const zones = [
-    ['sonos_everywhere', 'EVERYWHERE'],
-    ['living_room_arc_era_sub_living_room_arc_era_sub', 'LIVING · ARC'],
-    ['living_room_fives_living_room_fives', 'LIVING · FIVES'],
-    ['living_room_sym_living_room_sym', 'LIVING · SYM'],
-    ['living_room_amp_living_room_amp', 'LIVING · AMP'],
-    ['kitchen_kitchen', 'KITCHEN'],
-    ['coffee_bar_coffee_bar', 'COFFEE BAR'],
-    ['game_room_game_room', 'GAME ROOM'],
-    ['office_playbar_office_playbar', 'OFFICE'],
-    ['gazebo_gazebo', 'GAZEBO'],
-    ['patio_patio', 'PATIO'],
-    ['garage_garage', 'GARAGE'],
-    ['olivers_room_olivers_room', "OLIVER'S ROOM"],
-    ['mstr_bed_arc_rear_sym_sub_mstr_bed_arc_rear_sym_sub', 'MASTER · ARC'],
-    ['master_bed_port_sub_master_bed_port_sub', 'MASTER · PORT+SUB'],
-    ['master_bed_front_symfonisk_master_bed_front_symfonisk', 'MASTER · SYMFONISK'],
-    ['master_bed_3s_master_bed_3s', 'MASTER · 3s'],
-    ['master_bathroom_master_bathroom', 'MASTER BATH']
-  ];
-  const audio = [
-    ['text', 0, 0, 100, 8, { text: '🎵  WHOLE-HOME AUDIO', color: 'light', fontWeight: 'bold', fontSize: 32 }],
-    ['ha_script', 0.5, 9, 27, 10, { entity_id: 'script.sonos_everywhere', label: 'Group Everywhere', icon: '🔗', color: '#2dd4bf' }],
-    ['ha_script', 0.5, 20, 27, 10, { entity_id: 'script.sonos_ungroup', label: 'Ungroup Everywhere', icon: '🔓', color: '#94a3b8' }],
-    ['ha_script', 0.5, 31, 27, 14, { entity_id: 'script.announce_everywhere', label: 'Announce', icon: '📣', color: '#fbbf24', prompt: true }],
-    ['ha_script', 0.5, 46, 13.25, 11, { entity_id: 'script.announce_everywhere', label: 'Dinner', icon: '🍕', color: '#fbbf24', message: 'Dinner is ready, everyone!' }],
-    ['ha_script', 14.25, 46, 13.25, 11, { entity_id: 'script.announce_everywhere', label: 'Front Door', icon: '🚪', color: '#fbbf24', message: 'Someone is at the front door.' }],
-    ['ha_script', 0.5, 58, 13.25, 11, { entity_id: 'script.announce_everywhere', label: 'Wind Down', icon: '🌙', color: '#fbbf24', message: 'It is time to start winding down for the evening.' }],
-    ['ha_script', 14.25, 58, 13.25, 11, { entity_id: 'script.announce_everywhere', label: 'Load Up', icon: '🚗', color: '#fbbf24', message: 'Everyone load up, we are leaving in five minutes!' }]
-  ];
-  zones.forEach((z, i) => {
-    const col = i % 3;
-    const row = Math.floor(i / 3);
-    audio.push(['ha_media', 29 + col * 23.5, 9 + row * 15.2, 22.5, 14.6, { entity_id: 'media_player.' + z[0], label: z[1] }]);
-  });
-
-  mk('Whole-Home Audio', 'Sonos zones + Group / Ungroup / Announce actions', '#050811', audio);
+  mk('Whole-Home Audio', 'Movable Sonos sections: now playing, volumes, groups, grouping + announce strip', '#050811', SONOS_SECTION_BLOCKS);
   mk('IoT & Devices', 'Auto-filling HA device grids (WiFi / Zigbee / more)', '#090D16', [
     ['text', 0, 0, 100, 8, { text: '📡  DEVICES — WIFI · ZIGBEE · MORE', color: 'light', fontWeight: 'bold', fontSize: 32 }],
     ['ha_devices', 1, 10, 48, 42, { title: 'Lights & Plugs', domains: 'light,switch', columns: 2 }],
