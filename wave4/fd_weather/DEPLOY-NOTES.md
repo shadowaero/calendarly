@@ -1239,3 +1239,29 @@ Three asks: fix the neon-green Chalkboard background, raise the radar zoom cap 1
     concatenated at ship). Rollback: restore the two .bak-sonos files + `docker restart
     homeassistant`.
 
+
+- HA Overview dashboard REDESIGNED (2026-11-24 ~20:30, live on NAS HA 2026.11.3): the default
+  dashboard was auto-generated ("7 boxes") and is now a hand-built 2-view layout SAVED OVER IT
+  via the Lovelace WebSocket API (`lovelace/config/save` — dashboards are WS-only, not REST;
+  client helper `tmp/ha-ws.ps1`, PS7 ClientWebSocket with raw-JSON splicing). Pre-flight WS GET
+  returned `config_not_found` = dashboard was in GENERATED mode, so nothing was overwritten.
+  - View 1 **"Home"** = sections layout (max_columns 4) with 8 designed sections + badges row
+    (weather / Sonos Everywhere / shopping count): **Whole-Home Audio** hero (Sonos Everywhere
+    media tile with media-player feature + 3 vertical action tiles Group/Ungroup/Announce +
+    4 one-tap announce preset buttons), zone sections **Living Areas** (6 speakers, amber) /
+    **Master Suite** (5, indigo) / **Other Rooms + Outdoors & Utility** (6, blue/green),
+    **Screens & Voice** (LG OLED65C4 + SONY KD-85X91CJ tiles + 6 mic-privacy tiles),
+    **Weather** (met.no forecast card + sun tile), **Routines** (2 Sonos alarm toggles),
+    **Household** (shopping list + house notes markdown).
+  - View 2 **"Sound Settings"** = masonry + 2-col grid of 4 entities cards: both living-room
+    theaters + bedroom theater full tone/surround/night-speech stacks, and bass/treble for the
+    14 standalone speakers.
+  - Design = stock cards only (heading w/ subtitles, tile w/ `color` accents + `vertical`,
+    button, grid, weather-forecast, todo-list, markdown, entities) — no HACS dependencies.
+    All **102 entity references cross-checked against live states before save (0 missing)**
+    and read-back-verified after save. Rollback: `rm /config/.storage/lovelace` + restart HA
+    → back to auto-generated. Source of truth: `tmp/house-dashboard.json` (concat of
+    `house-dash-p{1..5}.json`). NOTE: the 2 ZHA motion sensors from the earlier session no
+    longer exist in the registry/states — a Motion section was designed but dropped; trivial
+    to re-add if they get re-paired.
+
