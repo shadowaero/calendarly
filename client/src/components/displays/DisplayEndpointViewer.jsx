@@ -31,6 +31,30 @@ export default function DisplayEndpointViewer({
   const touchStartRef = useRef({ x: 0, y: 0, time: 0 });
   const resumeTimerRef = useRef(null);
 
+  // ws7be: build watchdog. Display endpoints run for weeks without a page
+  // reload, so a deploy would leave them rendering with the previous JS bundle
+  // (block types unknown to the old bundle fall through to "Widget: …"
+  // placeholder boxes). The bundle token (?v=…) in index.html is bumped on
+  // every deploy — poll it and reload this endpoint when it changes.
+  useEffect(() => {
+    const selfScript = document.querySelector('script[src*="/assets/"]');
+    const mine = selfScript && selfScript.src.match(/[?&]v=([^&]+)/);
+    const myToken = mine ? mine[1] : null;
+    if (!myToken) return undefined;
+    let alive = true;
+    const check = async () => {
+      try {
+        const res = await fetch('/?_=' + Date.now(), { cache: 'no-store' });
+        const html = await res.text();
+        const m = html.match(/assets\/[^"']+\.js\?v=([^"'&]+)/);
+        if (alive && m && m[1] !== myToken) window.location.reload();
+      } catch (e) { /* offline or mid-deploy — try again on the next tick */ }
+    };
+    const poll = setInterval(check, 5 * 60 * 1000);
+    const first = setTimeout(check, 30 * 1000);
+    return () => { alive = false; clearInterval(poll); clearTimeout(first); };
+  }, []);
+
   const display = displays.find(d => d.slug === slug) || {
     name: 'Hardware Display',
     assigned_type: 'screen',

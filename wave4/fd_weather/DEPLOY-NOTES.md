@@ -1285,3 +1285,45 @@ Removed the 7-tile HA demo screen (thermostat upper-left) per request - supersed
 - **Shipped via `tmp/ship-nas.cjs`** (base64-over-ssh-stdin, md5-verified per file): client dist {index.html, index-BeW6UQkK.js, index-B6ys_heJ.css} + server src {db.js, hass.js, routes/ha.js, aiPrompt.js}. `docker restart family-dashboard`. Rollback: `*.bak-ws7bc` inside the container + old bundles retained.
 - **Retirement guard hardened:** the Home Assistant demo-screen retirement now matches by name + block-type fingerprint (ha_climate, ha_light x2, ha_sensor x4) instead of row id - works across instance DBs with different id sequences; still idempotent and cannot touch user-created screens.
 - **Verified on NAS :3080:** seeded `Whole-Home Audio` (id 19, 26 blocks) + `IoT & Devices` (id 20, 6 blocks); no Home Assistant screen remains; loop 1 = 14,12,17,2,19,20; `/api/ha/services` shows the widened whitelist (media_player/script/lock/input_boolean/number). Pi and NAS now run the same version (ws7ba bundle, ?v=ws7ba).
+
+## ws7be: kiosk stale-bundle fix (build watchdog) + Pi emoji font — 2026-11-25
+- User: "the two HA screens are showing placeholders. The actual cards are blank."
+  TWO independent root causes, both fixed + pixel-verified on the wall kiosk:
+  1) STALE BUNDLE ("cards blank"): the kiosk chromium (started Nov 24 18:15) still ran the
+     ws7bc JS bundle — its BlockRenderer has no `ha_sonos_panel` case → all 4 Sonos blocks
+     fell through to the `default:` fallback ("Widget: ha_sonos_panel" boxes). The ws7bd
+     code + data were correct all along (configs clean, `{states:[…]}` shape OK, 17 zones
+     @ device_class=speaker). The app never reloads itself (rotation is in-JS) → EVERY
+     deploy would repeat this.
+  2) MISSING EMOJI FONT ("placeholders"): Pi chromium had ZERO emoji fonts
+     (fc-list | grep -ci emoji = 0) → every user-configured emoji (screen titles, ha_script
+     icons) drew as □ tofu. Fixed: `sudo apt-get install fonts-noto-color-emoji` (0→1) +
+     fontconfig trigger + kiosk restart.
+- CODE FIX (1 file): `client/src/components/displays/DisplayEndpointViewer.jsx` gains a
+  build watchdog — polls `fetch('/?_=' + ts)` for the served index.html bundle token
+  (`assets/…js?v=TOKEN`) every 5 min (first check at 30 s) and `location.reload()`s the
+  display endpoint when a deploy bumps the token. Fail-safe: unparseable token → no-op.
+  Pure client; no server changes. Applies to `/display/<slug>` + `?mode=display` kiosks.
+- Deploy (?v=ws7be, bundle index-Ck6Q1vZX.js; CSS index-B6ys_heJ.css unchanged):
+  client/dist → Pi static only (no calendarly restart needed; `dist/index.html.bak-ws7be`
+  kept, old bundle index-BcGvd7pD.js left in assets as rollback) + NAS via ship-nas.cjs
+  (7/7 MD5 OK). Kiosk restarted via its own `/bin/bash /home/xxtoon/kiosk.sh` (autostart
+  entry — nothing auto-restarts chromium: `pkill -x chromium` + `setsid kiosk.sh`).
+- PIXEL VERIFIED: grim captures on `XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0`
+  (scrot sees BLACK — chromium is a Wayland client). Timed shots over one rotation caught
+  Whole-Home Audio live: Now Playing auto-focus (Game Room "Easy Runaway" → Office Playbar
+  TV/LIVE between shots), 17 zone sliders + mute, Grouping with crowned 3-zone Master
+  Bathroom group, Groups with per-member ungroup, announce + 4 script buttons. IoT &
+  Devices also live (Lights 89 / Sensors 21 / Helpers 67). Shots: tmp/post_*.png.
+- Rotation facts (for future shot timing): loop 1 [18,12,20,1,22,23] @ 60 s → screen 22 =
+  slot 5 ≈ 248–308 s after any kiosk page load. Detached shot kit pattern:
+  `setsid sh -c "sleep 255; grim …; sleep 30; grim …" &` (no `$` in the script — remote
+  shell expansion corrupts `$SECONDS` timing loops).
+- UPnP note (user concern): router UPnP is NOT involved — HA→Sonos control is LAN-local
+  SSDP/SOAP (`x-rincon:` joins). The Kitchen/Garage `501 Action Failed` = specific
+  speakers refusing the action (power-cycle candidates), same flakiness as Game Room.
+- Rollback: `client/dist/index.html.bak-ws7be` + prior bundle on Pi; watchdog lives only
+  in DisplayEndpointViewer.jsx (git revert); NAS file list = ship-nas.cjs manifest.
+- NOTE: NAS viewer devices (tablets/panels) keep whatever page they have open — one manual
+  refresh each; the watchdog then keeps them current on every future deploy automatically.
+
