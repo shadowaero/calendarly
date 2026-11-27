@@ -5,6 +5,7 @@
 import * as b from 'react';
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from 'react/jsx-runtime';
 import { format as Ge } from 'date-fns';
+import { fetchJSON as fdFetch, reportHealth as fdHealth } from './healthKit'; // ws7bf
 const n = { jsx: _jsx, jsxs: _jsxs, Fragment: _Fragment };
 
 // ===== ported from wave4/fd_weather/ws-widgets.js =====
@@ -178,7 +179,7 @@ function wsTile({ config: c, kind }) {
   b.useEffect(function () {
     if (!needWx) return;
     let dead = false;
-    const pull = function () { fetch('/api/weather?zip=' + encodeURIComponent(zip) + '&units=fahrenheit&days=2').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setWx(j); }).catch(function () {}); };
+    const pull = function () { fdFetch('/api/weather?zip=' + encodeURIComponent(zip) + '&units=fahrenheit&days=2').then(function (j) { if (!dead) { setWx(j); fdHealth('weather', true); pull.attempt = 0; } }).catch(function () { if (!dead) fdHealth('weather', false); if (!pull.retry) { pull.retry = true; pull.attempt = (pull.attempt || 0) + 1; window.setTimeout(function () { pull.retry = false; pull(); }, [30000, 60000, 120000, 900000][Math.min(pull.attempt - 1, 3)]); } }); };
     pull();
     const t = setInterval(pull, 900000);
     return function () { dead = true; clearInterval(t); };
@@ -186,7 +187,7 @@ function wsTile({ config: c, kind }) {
   b.useEffect(function () {
     if (!needSn) return;
     let dead = false;
-    const pull = function () { fetch('/api/sensors').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setSn(j || { sensors: [] }); }).catch(function () {}); };
+    const pull = function () { fdFetch('/api/sensors').then(function (j) { if (!dead) setSn(j || { sensors: [] }); }).catch(function () {}); };
     pull();
     const t = setInterval(pull, 60000);
     return function () { dead = true; clearInterval(t); };
@@ -194,7 +195,7 @@ function wsTile({ config: c, kind }) {
   b.useEffect(function () {
     if (kind !== 'alerts') return;
     let dead = false;
-    const pull = function () { fetch('/api/weather/alerts?zip=' + encodeURIComponent(zip)).then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setAl(j || { alerts: [] }); }).catch(function () {}); };
+    const pull = function () { fdFetch('/api/weather/alerts?zip=' + encodeURIComponent(zip)).then(function (j) { if (!dead) setAl(j || { alerts: [] }); }).catch(function () {}); };
     pull();
     const t = setInterval(pull, 600000);
     return function () { dead = true; clearInterval(t); };
@@ -417,7 +418,7 @@ function wsWS({ config: c, fontFamilyClass: k }) {
 
   b.useEffect(() => {
     let dead = false;
-    const pull = () => { fetch('/api/weather?zip=' + encodeURIComponent(zip) + '&units=fahrenheit&days=2').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setWx(j); }).catch(function () {}); };
+    const pull = () => { fdFetch('/api/weather?zip=' + encodeURIComponent(zip) + '&units=fahrenheit&days=2').then(function (j) { if (!dead) { setWx(j); fdHealth('weather', true); pull.attempt = 0; } }).catch(function () { if (!dead) fdHealth('weather', false); if (!pull.retry) { pull.retry = true; pull.attempt = (pull.attempt || 0) + 1; window.setTimeout(function () { pull.retry = false; pull(); }, [30000, 60000, 120000, 900000][Math.min(pull.attempt - 1, 3)]); } }); };
     pull();
     const t = setInterval(pull, 900000);
     return function () { dead = true; clearInterval(t); };
@@ -425,7 +426,7 @@ function wsWS({ config: c, fontFamilyClass: k }) {
 
   b.useEffect(() => {
     let dead = false;
-    const pull = () => { fetch('/api/sensors').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setSn(j || { sensors: [] }); }).catch(function () {}); };
+    const pull = () => { fdFetch('/api/sensors').then(function (j) { if (!dead) setSn(j || { sensors: [] }); }).catch(function () {}); };
     pull();
     const t = setInterval(pull, 60000);
     return function () { dead = true; clearInterval(t); };
@@ -433,7 +434,7 @@ function wsWS({ config: c, fontFamilyClass: k }) {
 
   b.useEffect(() => {
     let dead = false;
-    const pull = () => { fetch('/api/weather/alerts?zip=' + encodeURIComponent(zip)).then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setAl(j || { alerts: [] }); }).catch(function () {}); };
+    const pull = () => { fdFetch('/api/weather/alerts?zip=' + encodeURIComponent(zip)).then(function (j) { if (!dead) setAl(j || { alerts: [] }); }).catch(function () {}); };
     pull();
     const t = setInterval(pull, 600000);
     return function () { dead = true; clearInterval(t); };
@@ -638,18 +639,18 @@ function wxGUI(props) {
   b.useEffect(function () {
     let dead = false;
     const pull = function () {
-      fetch('/api/weather?zip=' + encodeURIComponent(zip) + '&units=fahrenheit&days=6').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) { setWx(j); setUpd(new Date()); } }).catch(function () {});
+      fdFetch('/api/weather?zip=' + encodeURIComponent(zip) + '&units=fahrenheit&days=6').then(function (j) { if (!dead) { setWx(j); setUpd(new Date()); fdHealth('weather', true); pull.attempt = 0; } }).catch(function () { if (!dead) fdHealth('weather', false); if (!pull.retry) { pull.retry = true; pull.attempt = (pull.attempt || 0) + 1; window.setTimeout(function () { pull.retry = false; pull(); }, [30000, 60000, 120000, 300000][Math.min(pull.attempt - 1, 3)]); } });
     };
     pull(); const iv = setInterval(pull, 300000); return function () { dead = true; clearInterval(iv); };
   }, [zip]);
   b.useEffect(function () {
     let dead = false;
-    const pull = function () { fetch('/api/sensors').then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setSn(j || { sensors: [] }); }).catch(function () {}); };
+    const pull = function () { fdFetch('/api/sensors').then(function (j) { if (!dead) setSn(j || { sensors: [] }); }).catch(function () {}); };
     pull(); const iv = setInterval(pull, 60000); return function () { dead = true; clearInterval(iv); };
   }, []);
   b.useEffect(function () {
     let dead = false;
-    const pull = function () { fetch('/api/weather/alerts?zip=' + encodeURIComponent(zip)).then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); }).then(function (j) { if (!dead) setAl(j || { alerts: [] }); }).catch(function () {}); };
+    const pull = function () { fdFetch('/api/weather/alerts?zip=' + encodeURIComponent(zip)).then(function (j) { if (!dead) setAl(j || { alerts: [] }); }).catch(function () {}); };
     pull(); const iv = setInterval(pull, 600000); return function () { dead = true; clearInterval(iv); };
   }, [zip]);
   b.useEffect(function () {

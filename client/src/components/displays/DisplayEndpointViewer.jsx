@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Lock, ChevronLeft, ChevronRight } from 'lucide-react';
 import BlocksCanvas from '../screens/BlocksCanvas';
 import { getBackgroundStyle } from '../screens/backgrounds';
+import { watchdogTick } from '../screens/widgets/healthKit';
 
 // How long the auto-rotation loop stays paused after the last touch/pointer
 // interaction, so users can tap buttons, fill forms, or use the on-screen
@@ -53,6 +54,19 @@ export default function DisplayEndpointViewer({
     const poll = setInterval(check, 5 * 60 * 1000);
     const first = setTimeout(check, 30 * 1000);
     return () => { alive = false; clearInterval(poll); clearTimeout(first); };
+  }, []);
+
+  // ws7bf: display DATA watchdog. The build watchdog above handles deploys; this
+  // one handles runtime data wedges ("weather sections blank until someone reboots
+  // the Pi"). Widgets reportHealth() on every poll; if any stays failed ~4+ min,
+  // reload this endpoint — the reboot-style heal, automatic, with an escalation
+  // budget (10 -> 20 -> 40 min between reloads, settling at max 1/hour) so a hard
+  // long outage can never become a reload loop.
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (watchdogTick()) window.location.reload();
+    }, 60 * 1000);
+    return () => clearInterval(t);
   }, []);
 
   const display = displays.find(d => d.slug === slug) || {

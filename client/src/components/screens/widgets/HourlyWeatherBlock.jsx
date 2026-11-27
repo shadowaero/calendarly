@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { Droplets } from 'lucide-react';
 import { resolveFontSizePt, fontSizeStyle } from '../fonts';
+import { fetchJSON, reportHealth } from './healthKit';
 
 // Dedicated hour-by-hour weather forecast widget.
 export function HourlyWeatherBlock({ config = {}, fontFamilyClass }) {
@@ -16,34 +17,48 @@ export function HourlyWeatherBlock({ config = {}, fontFamilyClass }) {
   const pt = resolveFontSizePt(config.fontSize, 12);
 
   useEffect(() => {
+    // ws7bf: 8s fetch timeout + backoff retry + watchdog health report. On failure
+    // the last good forecast stays on screen (stale beats blank) and we retry after
+    // 30s/60s/120s instead of idling out the full 15-minute interval.
     let mounted = true;
+    let hasData = false;
+    let attempt = 0;
+    let timer = null;
+    const RETRY_MS = [30000, 60000, 120000, 15 * 60 * 1000];
     const load = async () => {
       try {
         const q = zip ? `zip=${encodeURIComponent(zip)}` : 'lat=40.7128&lon=-74.0060';
-        const res = await fetch(`/api/weather?${q}&units=${units}&days=2`);
-        if (res.ok) {
-          const d = await res.json();
-          if (mounted) { setData(d); setError(null); }
-        } else if (mounted) {
-          setError('Weather unavailable');
-        }
+        const d = await fetchJSON(`/api/weather?${q}&units=${units}&days=2`);
+        if (!mounted) return;
+        hasData = true;
+        setData(d);
+        setError(null);
+        attempt = 0;
+        reportHealth('weather', true);
+        timer = setTimeout(load, 15 * 60 * 1000);
       } catch (e) {
-        if (mounted) setError('Weather unavailable');
+        if (!mounted) return;
+        reportHealth('weather', false);
+        if (!hasData) setError('Weather unavailable');
+        attempt += 1;
+        timer = setTimeout(load, RETRY_MS[Math.min(attempt - 1, RETRY_MS.length - 1)]);
       }
     };
     load();
-    const t = setInterval(load, 15 * 60 * 1000);
-    return () => { mounted = false; clearInterval(t); };
+    return () => { mounted = false; if (timer) clearTimeout(timer); };
   }, [zip, units]);
 
   return (
     <div className={`h-full w-full flex flex-col overflow-hidden p-3 ${fontFamilyClass}`}>
       <div className="flex items-center justify-between mb-2">
         <span className="font-bold uppercase tracking-wider text-slate-400 truncate mr-2" style={fontSizeStyle(pt, 0.7)}>{label}</span>
-        {data && <span className="text-slate-500 shrink-0" style={fontSizeStyle(pt, 0.7)}>{data.units === 'C' ? 'Celsius' : 'Fahrenheit'}</span>}
+        <span className="flex items-center gap-2 shrink-0">
+          {(error || data?.stale) && <span className="text-amber-400/80" style={fontSizeStyle(pt, 0.7)}>stale</span>}
+          {data && <span className="text-slate-500" style={fontSizeStyle(pt, 0.7)}>{data.units === 'C' ? 'Celsius' : 'Fahrenheit'}</span>}
+        </span>
       </div>
 
-      {error && (
+      {error && !data && (
         <div className="flex-1 flex items-center justify-center text-slate-500" style={fontSizeStyle(pt)}>{error}</div>
       )}
 

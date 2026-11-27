@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sun, Droplets, Wind } from 'lucide-react';
 import { resolveFontSizePt, fontSizeStyle } from '../fonts';
+import { fetchJSON, reportHealth } from './healthKit';
 
 export function ClockWeatherBlock({ config = {}, fontFamilyClass }) {
   const [now, setNow] = useState(new Date());
@@ -17,20 +18,30 @@ export function ClockWeatherBlock({ config = {}, fontFamilyClass }) {
   }, []);
 
   useEffect(() => {
+    // ws7bf: 8s fetch timeout + backoff retry + watchdog health report; the last
+    // known conditions stay on the clock face across failures (stale beats blank).
     let mounted = true;
+    let attempt = 0;
+    let timer = null;
+    const RETRY_MS = [30000, 60000, 120000, 15 * 60 * 1000];
     const loadWeather = async () => {
       try {
         const query = loc ? `zip=${encodeURIComponent(loc)}` : 'lat=40.7128&lon=-74.0060';
-        const res = await fetch(`/api/weather?${query}&units=${units}&days=1`);
-        if (res.ok) {
-          const d = await res.json();
-          if (mounted) setWeather(d);
-        }
-      } catch (e) {}
+        const d = await fetchJSON(`/api/weather?${query}&units=${units}&days=1`);
+        if (!mounted) return;
+        setWeather(d);
+        attempt = 0;
+        reportHealth('weather', true);
+        timer = setTimeout(loadWeather, 15 * 60 * 1000);
+      } catch (e) {
+        if (!mounted) return;
+        reportHealth('weather', false);
+        attempt += 1;
+        timer = setTimeout(loadWeather, RETRY_MS[Math.min(attempt - 1, RETRY_MS.length - 1)]);
+      }
     };
     loadWeather();
-    const t = setInterval(loadWeather, 15 * 60 * 1000);
-    return () => { mounted = false; clearInterval(t); };
+    return () => { mounted = false; if (timer) clearTimeout(timer); };
   }, [loc, units]);
 
   return (
@@ -41,9 +52,9 @@ export function ClockWeatherBlock({ config = {}, fontFamilyClass }) {
           <span className="truncate">{config.location || 'Local Weather'}</span>
         </div>
         <div className="font-black text-white shrink-0" style={fontSizeStyle(pt, 1.8)}>
-          {weather ? `${weather.current.temp}${unitSymbol}` : '72°F'}{' '}
+          {weather ? `${weather.current.temp}${unitSymbol}` : '—'}{' '}
           <span className="text-slate-400 font-normal" style={fontSizeStyle(pt, 0.8)}>
-            {weather?.current?.condition?.label || 'Sunny'}
+            {weather?.current?.condition?.label || '—'}
           </span>
         </div>
       </div>
@@ -59,10 +70,10 @@ export function ClockWeatherBlock({ config = {}, fontFamilyClass }) {
 
       <div className="text-slate-400 border-t border-slate-800/80 pt-1.5 flex items-center justify-between" style={fontSizeStyle(pt, 0.7)}>
         <span className="flex items-center gap-1">
-          <Droplets className="w-3 h-3 text-cyan-400" /> Humidity: {weather?.current?.humidity ?? 45}%
+          <Droplets className="w-3 h-3 text-cyan-400" /> Humidity: {weather?.current?.humidity != null ? `${weather.current.humidity}%` : '—'}
         </span>
         <span className="flex items-center gap-1">
-          <Wind className="w-3 h-3 text-sky-400" /> Wind: {weather?.current?.wind ?? 5} mph
+          <Wind className="w-3 h-3 text-sky-400" /> Wind: {weather?.current?.wind != null ? `${weather.current.wind} mph` : '—'}
         </span>
       </div>
     </div>

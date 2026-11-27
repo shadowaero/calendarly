@@ -21,6 +21,16 @@ import { writeAutoBackup } from './backup.js';
 import radarRouter from './routes/radar.js';
 import haRouter from './routes/ha.js';
 import { autofillHaBlocks } from './hass.js';
+import dns from 'node:dns';
+import net from 'node:net';
+
+// ws7bf: outbound-network hardening for ALL Node fetchers (weather, calendars,
+// Home Assistant…). The Pi journal showed `connect ENETUNREACH` (IPv6) /
+// `ETIMEDOUT` / `EAI_AGAIN` storms during Wi-Fi flaps while system curl (IPv4-first
+// happy-eyeballs) kept working — Node's fetch stuck to the broken IPv6/DNS path and
+// failed until the process restarted ("weather sections blank until Pi reboot").
+dns.setDefaultResultOrder('ipv4first');
+try { net.setDefaultAutoSelectFamily(true); } catch (e) { /* older Node */ }
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

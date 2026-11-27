@@ -1327,3 +1327,62 @@ Removed the 7-tile HA demo screen (thermostat upper-left) per request - supersed
 - NOTE: NAS viewer devices (tablets/panels) keep whatever page they have open — one manual
   refresh each; the watchdog then keeps them current on every future deploy automatically.
 
+
+## ws7bf: weather blank-sections auto-heal (fetch timeouts + stale cache + data watchdog + Pi net-watch) — 2026-11-26
+- User: "Pi kiosk Weather GUI — both sections (HOURLY + 4-DAY) empty." LIVE DIAGNOSIS
+  while broken: direct open-meteo + geocoding from the Pi = 200 OK (2.9 s), but
+  `/api/weather` via local `calendarly` = 500 `{"error":"fetch failed"}` (undici
+  socket/DNS failure) — the upstream fetch was wedged INSIDE the Node process while
+  system curl kept working; only a process restart healed it ("Pi reboot fixes it
+  for days"). 28 upstream error lines in 7 days.
+- ROOT CAUSE CHAIN: Pi Wi-Fi flap / power-save spikes (16→264 ms pings) → Node fetch
+  sticks to the broken IPv6/DNS path (journal: `connect ETIMEDOUT` + `ENETUNREACH
+  2620:…` IPv6 + `EAI_AGAIN` storms; curl's IPv4-first happy-eyeballs kept working) →
+  /api/weather 500s persist → widgets had NO timeout/retry/keep-last → sections blank.
+  New flaps hit live at 17:00/17:15 DURING this deploy (killed two ssh hops) — the
+  net-watch tier below now covers exactly this failure class.
+- FIX A (server): `server/src/index.js` — dns.setDefaultResultOrder('ipv4first') +
+  net.setDefaultAutoSelectFamily(true) for ALL outbound Node fetchers (weather,
+  calendars, HA). `weather.js` — every upstream fetch gets a 10 s AbortController
+  timeout + 1 retry; geocode cached 24 h (was: fetched on EVERY /api/weather call);
+  forecast cache → per-key Map `lat,lon,units,days` (was ONE global slot thrashed by
+  the days=1/2/4 widget mix) with STALE-WHILE-ERROR: on upstream failure the last good
+  snapshot is served with `stale:true` + `staleForSec` — a wall display never shows a
+  blank forecast card because of a transient outage. `routes/weather.js` — same
+  timeout+retry+stale for RainViewer radar metadata + NWS alerts (weather.gov
+  User-Agent header preserved through fetchJSONRetry opts).
+- FIX B (widgets): `HourlyWeatherBlock` / `WeatherForecastBlock` / `ClockWeatherBlock`
+  + `fdwKit.js` (wsTile / wsWS / wxGUI) — 8 s fetch timeout via new
+  `client/src/components/screens/widgets/healthKit.js` (fetchJSON + reportHealth);
+  on error KEEP last-good data + amber `stale` chip (big error text only before first
+  data); retry backoff 30/60/120 s → interval (fdwKit keeps its intervals + a single
+  retry chain with `pull.retry` dedupe and `pull.attempt` backoff). ClockWeather's
+  fake defaults ("72°F"/"Sunny"/45%/5 mph) → honest "—".
+- FIX C (display data watchdog): `displays/DisplayEndpointViewer.jsx` extends the ws7be
+  build watchdog: widgets reportHealth('weather', ok) per poll; a key failing ≥3 polls
+  AND ≥4 min triggers `location.reload()` (the reboot-style heal, automatic), with
+  reload escalation gaps 10→20→40→60 min (max 1/hour steady), a 3-min crash-loop floor,
+  and budget reset on recovery (healthKit.watchdogTick — window-level state, survives
+  loop screen switching between widgets).
+- FIX D (Pi network self-heal): `/usr/local/sbin/net-watch.sh` +
+  `net-watch.{service,timer}` (every 60 s: ping gateway + probe open-meteo). LAN down
+  3× → tier 1 `nmcli networking off/on`; still down ~3 min later → tier 2
+  `systemctl reboot` (journaled tag `net-watch`, rate-limited 1 reboot/hour via
+  /var/tmp/net-watch.state). Internet-only failures (LAN up) = log-only — an ISP
+  outage can't be fixed locally. Plus
+  `/etc/NetworkManager/conf.d/99-powersave-off.conf` (`wifi.powersave = 2`) + `iw`
+  installed for `iw dev wlan0 get power_save` checks (binary lives in /usr/sbin —
+  full path on non-interactive ssh). Source copies: `tmp/net-watch*`,
+  `tmp/99-powersave-off.conf`, `tmp/test-stale.sh`.
+- FIX E (deploy `?v=ws7bf`, bundle `index-DQLCrdmi.js`, CSS `index-DuTBSNvE.css` —
+  hash changed: stale-chip utility class): Pi `*.bak-ws7bf` of {weather.js,
+  routes/weather.js, index.js, dist/index.html} + prior bundle kept in assets;
+  `sudo systemctl restart calendarly` (plain `systemctl restart` fails polkit:
+  "Interactive authentication required") — also healed the live wedge. NAS via
+  ship-nas.cjs 6/6 MD5 OK + `docker restart family-dashboard` → :3080/api/weather
+  http=200 (0.74 s, live temp 62). Old chain quirks: long multi-line run_commands
+  batches are silently dropped/mangled by the shell-integration terminal — chain
+  remote steps SINGLE-LINE with `;`; capture output via remote redirect + scp-back;
+  `[IO.File]` .NET APIs ignore PowerShell `Set-Location` (use absolute paths).
+- Rollback: `*.bak-ws7bf` on Pi + old bundle in client/dist/assets; NAS file list =
+  ship-nas.cjs manifest (6 files); git revert restores pre-ws7bf behavior wholesale.
